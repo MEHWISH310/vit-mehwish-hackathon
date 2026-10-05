@@ -1,0 +1,16 @@
+ticker,name,sector,beta,start_price
+AAPL,Apple,Technology,1.2,235
+MSFT,Microsoft,Technology,1.1,510
+NVDA,NVIDIA,Technology,1.7,140
+GOOGL,Alphabet,Communication,1.15,190
+META,Meta Platforms,Communication,1.3,700
+AMZN,Amazon,Consumer,1.25,215
+WMT,Walmart,Consumer,0.55,95
+KO,Coca-Cola,Consumer,0.5,70
+JPM,JPMorgan Chase,Financials,1.05,280
+BAC,Bank of America,Financials,1.25,48
+GS,Goldman Sachs,Financials,1.35,700
+XOM,Exxon Mobil,Energy,0.9,110
+CVX,Chevron,Energy,0.95,155
+JNJ,Johnson & Johnson,Healthcare,0.55,160
+PFE,Pfizer,Healthcare,0.6,26
