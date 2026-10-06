@@ -1,0 +1,36 @@
+source_type,text,gt_sentiment,gt_event,gt_impact
+news,Microsoft tops profit forecasts and lifts annual revenue target,0.7,Earnings,6
+news,Goldman Sachs agrees to buy asset manager in $4 billion all-cash deal,0.4,Merger/Acquisition,5
+news,Fitch upgrades Bank of America's long-term rating citing stronger capital buffers,0.6,Credit Event,5
+news,Pfizer secures FDA clearance for new vaccine,0.6,Regulatory/Legal,5
+news,Nvidia introduces next-generation data center GPU as order books swell,0.7,Product Launch,5
+news,Markets surge as peace accord ends months of fighting in Eastern Europe,0.8,Geopolitical,7
+news,US inflation slows more than expected fueling bets on Fed easing,0.7,Macroeconomic,6
+news,Walmart reports stronger-than-expected sales and boosts dividend,0.7,Earnings,5
+news,Johnson & Johnson wins appeal in talc case,0.5,Regulatory/Legal,4
+news,Meta shares tumble as ad revenue growth disappoints investors,-0.7,Earnings,6
+news,Moody's cuts Chevron outlook to negative on weakening cash generation,-0.5,Credit Event,5
+news,Amazon faces federal probe over marketplace practices,-0.6,Regulatory/Legal,6
+news,Exxon scraps planned takeover after shareholder revolt,-0.3,Merger/Acquisition,4
+news,Pfizer pulls blood-pressure drug from shelves after contamination found,-0.8,Product Launch,7
+news,Bank of America flags surge in soured loans and sets aside extra reserves,-0.7,Credit Event,6
+news,Fresh sanctions and naval clashes in the Red Sea send oil spiking and stocks sliding,-0.7,Geopolitical,8
+news,Unemployment jumps to highest in three years deepening recession worries,-0.8,Macroeconomic,8
+news,Fed officials warn rates may stay elevated through next year,-0.5,Macroeconomic,6
+news,Coca-Cola warns of softer volumes as consumers trade down,-0.6,Earnings,5
+news,Apple to hold annual developer conference in June,0.0,Product Launch,2
+news,JPMorgan CEO to speak at industry conference on Thursday,0.0,Other,1
+news,Chevron affirmed at AA- by rating agency with outlook stable,0.1,Credit Event,2
+news,Central bank governor to testify before parliament next week,0.0,Macroeconomic,2
+social,$NVDA ripping today calls printing 🚀🚀,0.7,Other,3
+social,$META ads weak guide light. getting out,-0.6,Earnings,4
+social,lol $BAC downgrade incoming? spreads look ugly,-0.5,Credit Event,4
+social,$XOM printing money with crude this high,0.6,Other,3
+social,$PFE trial results look solid bullish,0.6,Other,3
+social,oil spike + war headlines = red day for everything 😬 #geopolitics,-0.6,Geopolitical,5
+social,fed pivot coming?? inflation finally cooling 📈 #Fed,0.6,Macroeconomic,5
+social,$GS bought a company not sure how i feel about it,0.0,Merger/Acquisition,3
+social,$KO flat all week boring,0.0,Other,1
+social,$AMZN recall of their new gadget? yikes,-0.5,Product Launch,4
+social,$JNJ court win!! 🎉,0.6,Regulatory/Legal,4
+social,$WMT crushing earnings again buying more,0.7,Earnings,5

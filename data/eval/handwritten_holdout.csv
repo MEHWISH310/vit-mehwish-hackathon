@@ -1,0 +1,21 @@
+source_type,text,gt_sentiment,gt_event,gt_impact
+news,Alphabet reports quarterly profit well above Wall Street estimates,0.7,Earnings,6
+news,S&P cuts Pfizer to BBB after debt-funded purchase,-0.6,Credit Event,6
+news,Chevron to acquire shale producer in $8 billion transaction,0.4,Merger/Acquisition,5
+news,Regulators fine JPMorgan over reporting failures,-0.6,Regulatory/Legal,6
+news,Amazon unveils faster delivery drones to wide acclaim,0.6,Product Launch,4
+news,Tensions flare as border clashes erupt rattling global equities,-0.7,Geopolitical,8
+news,Consumer prices rise faster than forecast stoking fears of further rate increases,-0.6,Macroeconomic,7
+news,Meta lowers sales outlook for the coming quarter,-0.6,Earnings,5
+news,Exxon Mobil shares climb as profits beat analyst expectations,0.7,Earnings,5
+news,Trade talks collapse as new duties are announced on imported goods,-0.6,Geopolitical,7
+news,Central bank holds rates steady as expected,0.0,Macroeconomic,2
+news,Johnson & Johnson to present trial data at medical conference next month,0.0,Other,2
+social,$AAPL rough day sellers everywhere 📉,-0.5,Other,3
+social,$MSFT earnings were great adding to my position 📈,0.6,Earnings,4
+social,markets rattled by war news nowhere to hide 😰,-0.6,Geopolitical,5
+social,$KO announces new flavor lineup kinda excited,0.3,Product Launch,2
+social,$JPM fined by regulators again same old story,-0.5,Regulatory/Legal,4
+social,cpi came in hot no rate cuts anytime soon 🚨,-0.6,Macroeconomic,5
+social,$GS and rival rumored to merge deal could be huge 👀,0.3,Merger/Acquisition,4
+social,$CVX credit rating upgraded balance sheet solid ✅,0.5,Credit Event,4

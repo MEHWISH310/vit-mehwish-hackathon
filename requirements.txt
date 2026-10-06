@@ -1,7 +1,13 @@
 pandas
 numpy
+scipy
 scikit-learn
-streamlit
-plotly
+joblib
+vaderSentiment
 fastapi
 uvicorn
+httpx
+pydantic
+streamlit
+plotly
+pytest
