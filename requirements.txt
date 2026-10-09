@@ -12,4 +12,5 @@ pydantic>=2.8,<3
 streamlit>=1.50,<2
 plotly>=5.24,<8
 matplotlib>=3.9.1,<4
+yfinance>=0.2.50,<2  # only for scripts/fetch_real_data.py (data is already committed)
 pytest>=8.3,<10
