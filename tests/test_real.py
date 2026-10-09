@@ -65,6 +65,6 @@ def test_dashboard_real_mode(real_outputs):
     at = AppTest.from_file(APP, default_timeout=180).run()
     at.sidebar.radio[0].set_value(at.sidebar.radio[0].options[1]).run()
     assert not at.exception, at.exception
-    assert len(at.tabs) == 3 and not at.error
-    at.button[0].click().run()
+    assert len(at.tabs) == 4 and not at.error
+    next(b for b in at.button if b.label == "Analyze").click().run()
     assert not at.exception, at.exception

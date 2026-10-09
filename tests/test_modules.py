@@ -190,6 +190,10 @@ def test_event_stress_over_bus(portfolio):
 APP = str(Path(__file__).resolve().parents[1] / "app.py")
 
 
+def analyze(at):
+    next(b for b in at.button if b.label == "Analyze").click().run()
+
+
 def test_dashboard_runs_end_to_end():
     from src.engine.pipeline import MODEL_PATH, OUT, main
     if not (MODEL_PATH.exists() and (OUT / "signals.csv").exists()):
@@ -197,11 +201,20 @@ def test_dashboard_runs_end_to_end():
     from streamlit.testing.v1 import AppTest
     at = AppTest.from_file(APP, default_timeout=180).run()
     assert not at.exception, at.exception
-    assert len(at.tabs) == 3 and not at.error
-    at.button[0].click().run()  # "Analyze" in the try-it-live box scores text with the saved model
+    assert len(at.tabs) == 4 and not at.error
+    analyze(at)  # the try-it-live box scores text with the saved model
     assert not at.exception, at.exception
-    assert any(m.label == "Sentiment" for m in at.metric)
-    assert "TRIGGER" in at.info[0].value  # the pre-filled demo headline crosses the impact threshold
+    assert "TRIGGER" in at.success[0].value  # the pre-filled demo headline crosses the impact threshold
+
+
+def test_dashboard_example_pills_fill_the_text_box():
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(APP, default_timeout=180).run()
+    at.session_state["example"] = "Plain downgrade"
+    at.session_state["txt"] = "Moody's downgrades Goldman Sachs to junk as trading losses mount"
+    analyze(at)
+    assert not at.exception, at.exception
+    assert "would not trigger" in at.info[0].value  # impact below 7: shows the threshold working both ways
 
 
 def test_dashboard_explains_missing_signals(monkeypatch, tmp_path):
