@@ -164,7 +164,18 @@ def test_trigger_cooldown_and_adverse_only(portfolio):
     st.on_signal(_sig("2026-01-05 12:00", "AAPL", +0.9, impact=9, event_type="Earnings"))  # beat: no stress
     st.on_signal(_sig("2026-01-05 12:00", "AAPL", -0.9, impact=9, event_type="Other"))  # no scenario
     assert len(st.triggers) == 2
-    assert st.suppressed == {"below_threshold": 0, "no_scenario": 1, "not_adverse": 1, "cooldown": 1}
+    assert st.suppressed == {"below_threshold": 0, "low_confidence": 0, "no_scenario": 1, "not_adverse": 1,
+                             "cooldown": 1}
+
+
+def test_low_confidence_event_does_not_trigger(portfolio):
+    st = StressTester(portfolio)
+    st.on_signal({**_sig("2026-01-05 10:00", "", -0.8, impact=9, event_type="Credit Event", scope="market"),
+                  "event_confidence": 0.35})  # keyword fallback, e.g. "default setting"
+    st.on_signal({**_sig("2026-01-05 11:00", "", -0.8, impact=9, event_type="Macroeconomic", scope="market"),
+                  "event_confidence": 0.85})
+    assert len(st.triggers) == 1 and st.triggers[0].scenario == "Macroeconomic"
+    assert st.suppressed["low_confidence"] == 1
 
 
 def test_event_stress_over_bus(portfolio):

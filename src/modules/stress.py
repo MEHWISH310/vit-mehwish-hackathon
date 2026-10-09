@@ -6,9 +6,11 @@
     st.triggers          # one StressResult per distinct high-impact event
     run_stress(portfolio, Shock(equity_pct=-10, rate_bp=200))   # any custom shock, run by hand
 
-Trigger rule: impact > threshold (strictly, default 7) AND the event type has a scenario. Idiosyncratic
-scenarios (Earnings, M&A, Regulatory/Legal, Product Launch) only fire on negative sentiment, since we stress
-the adverse case. A 24h cooldown per (event_type, ticker) collapses a burst of articles/posts about the
+Trigger rule: impact > threshold (strictly, default 7) AND the event classifier is confident (event_confidence >=
+0.60, the engine's own "unsure" cut-off below which keyword rules take over; on real headlines those fallbacks are
+mostly false alarms such as a lifestyle piece about a "default setting") AND the event type has a scenario AND the
+signal's sentiment is negative: a stress test models the adverse case, so "inflation eases" or a ceasefire does not
+fire an inflation-shock or risk-off scenario. A 24h cooldown per (event_type, ticker) collapses a burst of articles/posts about the
 same story into one trigger. Every shock is scaled by severity = impact / 10.
 
 Valuation is a deliberately SIMPLIFIED FIRST-ORDER model. Per asset, on risk_notional (not market value:
@@ -29,6 +31,7 @@ import pandas as pd
 from src.universe import DATA
 
 PORTFOLIO_PATH = DATA / "portfolio.csv"
+MIN_CONFIDENCE = 0.60  # = EventClassifier.min_conf: below it the classifier is unsure and keyword rules decide
 
 # worse credit quality -> spreads widen more for the same market move
 RATING_MULTIPLIER = {"AA": 0.6, "A+": 0.7, "A": 0.8, "BBB+": 0.9, "BBB": 1.0, "NR": 1.0, "BB": 1.8, "B": 2.5}
@@ -58,11 +61,11 @@ class Scenario:
 
 # Full-severity (impact = 10) shocks; scaled by impact / 10 at trigger time.
 SCENARIOS = {
-    "Geopolitical": Scenario(Shock(-12, -40, 100), False,
+    "Geopolitical": Scenario(Shock(-12, -40, 100), True,
                              "Risk-off: equities sell off, flight to quality pulls yields down, credit widens"),
-    "Macroeconomic": Scenario(Shock(-8, 100, 60), False,
+    "Macroeconomic": Scenario(Shock(-8, 100, 60), True,
                               "Inflation / hawkish surprise: rates up, equities down, spreads wider"),
-    "Credit Event": Scenario(Shock(-6, -10, 150, idio_equity_pct=-15, idio_spread_bp=300), False,
+    "Credit Event": Scenario(Shock(-6, -10, 150, idio_equity_pct=-15, idio_spread_bp=300), True,
                              "Downgrade/default: contagion in credit, name-specific gap lower"),
     "Regulatory/Legal": Scenario(Shock(-2, 0, 15, idio_equity_pct=-12, idio_spread_bp=120), True,
                                  "Fine / probe / ruling: mostly hits the named company"),
@@ -159,19 +162,23 @@ class StressTester:
     """Bus subscriber: `bus.subscribe(st.on_signal, min_impact=7, name="Module B")`."""
 
     def __init__(self, portfolio: pd.DataFrame, scenarios: dict = None, threshold: float = 7.0,
-                 cooldown: pd.Timedelta = pd.Timedelta(hours=24)):
+                 cooldown: pd.Timedelta = pd.Timedelta(hours=24), min_confidence: float = MIN_CONFIDENCE):
         self.portfolio = portfolio
         self.scenarios = scenarios or SCENARIOS
         self.threshold = threshold
         self.cooldown = cooldown
+        self.min_confidence = min_confidence
         self.triggers: list[StressResult] = []
-        self.suppressed = {"below_threshold": 0, "no_scenario": 0, "not_adverse": 0, "cooldown": 0}
+        self.suppressed = {"below_threshold": 0, "low_confidence": 0, "no_scenario": 0, "not_adverse": 0,
+                           "cooldown": 0}
         self._last: dict = {}
 
     def check(self, s: dict) -> Optional[str]:
         """None if the signal should trigger, otherwise the reason it does not."""
         if not s["impact"] > self.threshold:
             return "below_threshold"
+        if s.get("event_confidence", 1.0) < self.min_confidence:
+            return "low_confidence"
         sc = self.scenarios.get(s["event_type"])
         if sc is None:
             return "no_scenario"
@@ -198,12 +205,12 @@ class StressTester:
 
 
 def run_event_stress(signals: pd.DataFrame, portfolio: pd.DataFrame = None, threshold: float = 7.0,
-                     cooldown_h: float = 24) -> StressTester:
+                     cooldown_h: float = 24, min_confidence: float = MIN_CONFIDENCE) -> StressTester:
     """Replay engine signals through a SignalBus into a StressTester."""
     from src.engine.bus import SignalBus
 
     st = StressTester(load_portfolio() if portfolio is None else portfolio, threshold=threshold,
-                      cooldown=pd.Timedelta(hours=cooldown_h))
+                      cooldown=pd.Timedelta(hours=cooldown_h), min_confidence=min_confidence)
     bus = SignalBus()
     bus.subscribe(st.on_signal, min_impact=threshold, name="Module B")
     sig = signals.copy()
