@@ -1,8 +1,10 @@
 """Risk-signal dashboard: the NLP engine's output and both downstream modules in one place.
 
     python -m src.engine.pipeline     # once: trains the engine, writes outputs/signals.csv
+    python -m src.engine.real         # optional: real-data mode (outputs/real_signals.csv)
     streamlit run app.py
 """
+import json
 import sys
 from pathlib import Path
 
@@ -16,6 +18,7 @@ import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from src.engine.pipeline import MODEL_PATH, OUT  # noqa: E402
+from src.engine.real import REAL, REAL_MODEL_PATH  # noqa: E402
 from src.modules.rebalancer import RebalanceConfig, run_backtest, top_drivers  # noqa: E402
 from src.modules.stress import PRESETS, SCENARIOS, Shock, load_portfolio, run_event_stress, run_stress  # noqa: E402
 from src.universe import DATA, load_universe  # noqa: E402
@@ -24,7 +27,12 @@ from src.universe import DATA, load_universe  # noqa: E402
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 POS, NEG, MID = "#2a78d6", "#d03b3b", "#f0efec"
 DIVERGING = [[0, NEG], [0.5, MID], [1, POS]]
-SIGNALS_PATH = OUT / "signals.csv"
+PLURAL = {"Loan": "loans", "Bond": "bonds", "Derivative": "derivatives", "Equity": "equities"}
+SYNTHETIC, REAL_MODE = "Synthetic (generated text + prices)", "Real (Google News headlines + Yahoo Finance prices)"
+SOURCES = {  # signals file, prices file, trained engine, command that creates them
+    SYNTHETIC: (OUT / "signals.csv", DATA / "prices.csv", MODEL_PATH, "python -m src.engine.pipeline"),
+    REAL_MODE: (OUT / "real_signals.csv", REAL / "prices_yahoo.csv", REAL_MODEL_PATH, "python -m src.engine.real"),
+}
 
 st.set_page_config(page_title="NLP Risk Engine", page_icon=":bar_chart:", layout="wide")
 
@@ -36,56 +44,68 @@ def fig_style(fig, height=360):
 
 
 @st.cache_data
-def load_signals(mtime: float) -> pd.DataFrame:
-    s = pd.read_csv(SIGNALS_PATH, parse_dates=["timestamp"])
+def load_signals(path: str, mtime: float) -> pd.DataFrame:
+    s = pd.read_csv(path, parse_dates=["timestamp"])
     s["ticker"] = s["ticker"].fillna("")
     return s
 
 
 @st.cache_data
-def load_prices() -> pd.DataFrame:
-    return pd.read_csv(DATA / "prices.csv", parse_dates=["date"])
+def load_prices(path: str) -> pd.DataFrame:
+    return pd.read_csv(path, parse_dates=["date"])
 
 
 @st.cache_data
-def backtest(mtime: float, half_life_h, tilt, max_weight, max_turnover):
+def backtest(sig_path: str, mtime: float, px_path: str, half_life_h, tilt, max_weight, max_turnover):
     cfg = RebalanceConfig(half_life_h=half_life_h, tilt=tilt, max_weight=max_weight, max_turnover=max_turnover)
-    return run_backtest(load_signals(mtime), load_prices(), cfg), cfg
+    return run_backtest(load_signals(sig_path, mtime), load_prices(px_path), cfg), cfg
 
 
 @st.cache_data
-def stress_run(mtime: float, threshold, cooldown_h):
-    st_ = run_event_stress(load_signals(mtime), load_portfolio(), threshold=threshold, cooldown_h=cooldown_h)
+def stress_run(sig_path: str, mtime: float, threshold, cooldown_h, min_conf):
+    st_ = run_event_stress(load_signals(sig_path, mtime), load_portfolio(), threshold=threshold, cooldown_h=cooldown_h,
+                           min_confidence=min_conf)
     return st_.triggers, st_.suppressed
 
 
 @st.cache_resource
-def load_engine():
+def load_engine(path: str):
     from src.engine.pipeline import RiskEngine
-    return RiskEngine.load()
+    return RiskEngine.load(Path(path))
 
 
 st.title("NLP Risk Engine: news & social text to risk signals")
+with st.sidebar:
+    mode = st.radio("Data source", [SYNTHETIC, REAL_MODE])
+SIGNALS_PATH, PRICES_PATH, ENGINE_PATH, MAKE_CMD = SOURCES[mode]
 if not SIGNALS_PATH.exists():
-    st.error("No engine output found at `outputs/signals.csv`. Generate it first (takes a few seconds):")
-    st.code("python -m src.engine.pipeline", language="bash")
+    st.error(f"No engine output found at `outputs/{SIGNALS_PATH.name}`. Generate it first:")
+    st.code(MAKE_CMD if mode == SYNTHETIC else "python -m src.engine.pipeline\n" + MAKE_CMD, language="bash")
     st.stop()
 
 mtime = SIGNALS_PATH.stat().st_mtime
-signals = load_signals(mtime)
+signals = load_signals(str(SIGNALS_PATH), mtime)
 universe = load_universe()
+is_real = mode == REAL_MODE
 
 with st.sidebar:
     st.header("Module B: stress trigger")
     threshold = st.slider("Impact threshold (trigger when impact >)", 5.0, 9.5, 7.0, 0.5)
     cooldown_h = st.slider("Cooldown per (event, ticker), hours", 0, 72, 24, 6)
+    min_conf = st.slider("Min event-classifier confidence", 0.0, 0.95, 0.60, 0.05,
+                         help="Below 0.60 the classifier is unsure and keyword rules decide; on real headlines those "
+                              "are mostly false alarms.")
     st.header("Module A: rebalancer")
     tilt = st.slider("Sentiment tilt", 0.0, 4.0, 1.5, 0.25)
     max_weight = st.slider("Max weight per stock", 0.08, 0.30, 0.15, 0.01)
     max_turnover = st.slider("Max one-way turnover per day", 0.02, 1.0, 0.20, 0.02)
     half_life_h = st.slider("Sentiment half-life, hours", 6, 168, 36, 6)
-    st.caption("All data is synthetic (see README). Prices were generated from the same events as the text, "
-               "so backtest performance is optimistic by construction.")
+    if is_real:
+        st.caption("Real public data: Google News headlines (entering at the next day's close) and Yahoo Finance "
+                   "closes. Sentiment model retrained on real labelled text; event/impact models are synthetic-trained.")
+    else:
+        st.caption("All data is synthetic (see README). Prices were generated from the same events as the text, "
+                   "so backtest performance is optimistic by construction.")
 
 tab_engine, tab_a, tab_b = st.tabs(["Engine signals", "Module A: index rebalancer", "Module B: stress test"])
 
@@ -126,32 +146,49 @@ with tab_engine:
                  [["timestamp", "source_type", "ticker", "sentiment", "event_type", "impact", "event_confidence",
                    "headline"]], width="stretch", hide_index=True)
 
+    real_eval = OUT / "real_eval_metrics.json"
+    if real_eval.exists():
+        st.subheader("How accurate is the sentiment on REAL text?")
+        ev = json.loads(real_eval.read_text())
+        names = {"majority_class_baseline": "Always 'neutral' (baseline)", "lexicon_only": "Lexicon only",
+                 "synthetic_trained_engine": "Engine trained on synthetic text",
+                 "real_trained_label": "Retrained on real labelled text"}
+        rows = [{"model": label,
+                 "tweets: accuracy": ev["twitter_test"][k]["accuracy"], "tweets: macro-F1": ev["twitter_test"][k]["macro_f1"],
+                 "news: accuracy": ev["phrasebank_5fold"][k]["accuracy"], "news: macro-F1": ev["phrasebank_5fold"][k]["macro_f1"]}
+                for k, label in names.items()]
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        st.caption(f"Held-out real data: {ev['twitter_test']['n']:,} finance tweets (official test split) and "
+                   f"{ev['phrasebank_5fold']['n']:,} Financial PhraseBank news sentences (5-fold CV). Real-data mode uses "
+                   "the retrained model; synthetic mode keeps the original engine.")
+
     st.subheader("Try it live")
     txt = st.text_area("Paste a headline or post", "Goldman Sachs warns of covenant breach as losses mount, a major shock for credit markets")
     src = st.radio("Source type", ["news", "social"], horizontal=True)
     if st.button("Analyze"):
-        if not MODEL_PATH.exists():
-            st.warning("No trained model at `models/engine.joblib`. Run `python -m src.engine.pipeline` first.")
+        if not ENGINE_PATH.exists():
+            st.warning(f"No trained model at `models/{ENGINE_PATH.name}`. Run `{MAKE_CMD}` first.")
         else:
             from src.engine.ingest import from_raw_text
             docs = from_raw_text(txt, src)
             if docs.empty:
                 st.warning("Text is empty after cleaning.")
             else:
-                out = load_engine().analyze(docs).iloc[0]
+                out = load_engine(str(ENGINE_PATH)).analyze(docs).iloc[0]
                 r = st.columns(4)
                 r[0].metric("Sentiment", f"{out.sentiment:+.2f}")
                 r[1].metric("Event", out.event_type, f"confidence {out.event_confidence:.0%}", delta_color="off")
                 r[2].metric("Impact (1-10)", f"{out.impact:.1f}")
                 r[3].metric("Ticker", out.ticker or "market-wide")
                 sc = SCENARIOS.get(out.event_type)
-                fires = out.impact > threshold and sc is not None and (not sc.adverse_only or out.sentiment < 0)
+                fires = (out.impact > threshold and out.event_confidence >= min_conf and sc is not None
+                         and (not sc.adverse_only or out.sentiment < 0))
                 st.info(f"Module B would {'TRIGGER a ' + out.event_type + ' stress test' if fires else 'not trigger'}"
                         f" (impact {out.impact:.1f} vs threshold {threshold:g}).")
 
 # ---------------------------------------------------------------- Module A
 with tab_a:
-    res, cfg = backtest(mtime, half_life_h, tilt, max_weight, max_turnover)
+    res, cfg = backtest(str(SIGNALS_PATH), mtime, str(PRICES_PATH), half_life_h, tilt, max_weight, max_turnover)
     m, b = res.metrics["sentiment_index"], res.metrics["equal_weight"]
     c = st.columns(5)
     c[0].metric("Total return", f"{m['total_return']:+.2%}", f"{m['total_return'] - b['total_return']:+.2%} vs EW")
@@ -224,17 +261,18 @@ with tab_a:
 # ---------------------------------------------------------------- Module B
 with tab_b:
     portfolio = load_portfolio()
-    triggers, suppressed = stress_run(mtime, threshold, cooldown_h)
+    triggers, suppressed = stress_run(str(SIGNALS_PATH), mtime, threshold, cooldown_h, min_conf)
     summ = pd.DataFrame([t.summary() for t in triggers])
     c = st.columns(4)
     c[0].metric("Portfolio value", f"${portfolio.market_value.sum():,.1f}m")
     c[1].metric("Assets", f"{len(portfolio)}")
     c[2].metric("Stress tests triggered", f"{len(summ)}")
     c[3].metric("Worst trigger", f"{summ.pnl_pct.min():.2%}" if len(summ) else "n/a")
-    st.caption("Portfolio: " + ", ".join(f"{v} {k}s" for k, v in portfolio.asset_type.value_counts().items())
+    st.caption("Portfolio: " + ", ".join(f"{v} {PLURAL.get(k, k)}" for k, v in portfolio.asset_type.value_counts().items())
                + ". Values in $m; P&L is computed on risk notional.")
     st.caption(f"Signals ignored: {suppressed['not_adverse']} not adverse (positive news on an idiosyncratic event), "
-               f"{suppressed['cooldown']} inside cooldown, {suppressed['below_threshold']} at or below threshold.")
+               f"{suppressed['cooldown']} inside cooldown, {suppressed['below_threshold']} at or below threshold, "
+               f"{suppressed['low_confidence']} with an unsure event classification.")
 
     if summ.empty:
         st.info("No signal exceeds the threshold. Lower it in the sidebar.")
@@ -255,8 +293,10 @@ with tab_b:
             labels = {i: f"{pd.Timestamp(summ.at[i, 'timestamp']):%Y-%m-%d %H:%M} | {summ.at[i, 'event_type']} "
                          f"{summ.at[i, 'ticker'] or '(market)'} | impact {summ.at[i, 'impact']:.1f} | "
                          f"{summ.at[i, 'pnl_pct']:+.2%}" for i in sub.index}
-            default = list(sub.index).index(sub.pnl_pct.idxmin())
-            sel = st.selectbox("Pick a triggered event (default: worst)", list(sub.index), index=default,
+            # many triggers tie on loss (the shock depends only on impact), so rank by loss x how negative the news is
+            default = list(sub.index).index((sub.pnl_pct * sub.sentiment.abs()).idxmin())
+            sel = st.selectbox("Pick a triggered event (default: most adverse = loss x negativity)", list(sub.index),
+                               index=default,
                                format_func=labels.get)
             res = triggers[sel]
             sig = res.signal
