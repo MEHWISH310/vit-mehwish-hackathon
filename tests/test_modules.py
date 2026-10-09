@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -170,3 +172,30 @@ def test_event_stress_over_bus(portfolio):
                         _sig("2026-01-05 11:00", "", -0.8, impact=5, event_type="Macroeconomic", scope="market")])
     st = run_event_stress(sig, portfolio)
     assert len(st.triggers) == 1 and len(st.summary()) == 1
+
+
+# ---------------- Dashboard ----------------
+
+APP = str(Path(__file__).resolve().parents[1] / "app.py")
+
+
+def test_dashboard_runs_end_to_end():
+    from src.engine.pipeline import MODEL_PATH, OUT, main
+    if not (MODEL_PATH.exists() and (OUT / "signals.csv").exists()):
+        main()
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(APP, default_timeout=180).run()
+    assert not at.exception, at.exception
+    assert len(at.tabs) == 3 and not at.error
+    at.button[0].click().run()  # "Analyze" in the try-it-live box scores text with the saved model
+    assert not at.exception, at.exception
+    assert any(m.label == "Sentiment" for m in at.metric)
+
+
+def test_dashboard_explains_missing_signals(monkeypatch, tmp_path):
+    import src.engine.pipeline as pl
+    monkeypatch.setattr(pl, "OUT", tmp_path)  # app reads OUT at import time
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    assert not at.exception
+    assert "python -m src.engine.pipeline" in at.code[0].value
