@@ -100,7 +100,37 @@ def compute() -> dict:
         "scenarios": {k: {**vars(v.shock), "adverse_only": v.adverse_only, "rationale": v.rationale}
                       for k, v in SCENARIOS.items()},
     }
-    return r, bt, st, worst, brief
+
+    # ---- real-data mode (python -m src.engine.real): real headlines + Yahoo prices, real-text evaluation
+    rs = pd.read_csv(OUT / "real_signals.csv")
+    rp = pd.read_csv(DATA / "real" / "prices_yahoo.csv")
+    rbt = run_backtest(rs, rp, cfg)
+    rpl = [run_backtest(rs.assign(sentiment=rng.permutation(rs.sentiment.values)), rp, cfg)
+           .metrics["sentiment_index"]["total_return"] for _ in range(20)]
+    rsens = []
+    for tilt in [0.75, 1.5, 3.0]:
+        for hl in [12, 36, 96]:
+            m = run_backtest(rs, rp, RebalanceConfig(tilt=tilt, half_life_h=hl)).metrics["sentiment_index"]
+            rsens.append({"tilt": tilt, "half_life_h": hl, **m})
+    rst = run_event_stress(rs, port)
+    rsum = rst.summary()
+    top = rst.triggers[int((rsum.pnl_pct * rsum.sentiment.abs()).idxmin())]  # most adverse = loss x negativity
+    headlines = pd.read_csv(DATA / "real" / "news_headlines.csv")
+    r["real"] = {
+        "eval": json.loads((OUT / "real_eval_metrics.json").read_text()),
+        "headlines_raw": len(headlines), "publishers": int(headlines.publisher.nunique()),
+        "signals": len(rs), "by_scope": rs.scope.value_counts().to_dict(),
+        "impact_gt7": int((rs.impact > 7).sum()), "price_days": int(rp.date.nunique()),
+        "module_a": {"metrics": rbt.metrics, "days": len(rbt.weights), "sensitivity": rsens,
+                     "placebo_shuffled_sentiment_total_return": {
+                         "mean": float(np.mean(rpl)), "min": float(np.min(rpl)), "max": float(np.max(rpl)), "runs": 20}},
+        "module_b": {"triggers": len(rsum), "suppressed": rst.suppressed,
+                     "by_event": rsum.groupby("event_type").agg(n=("pnl", "size"), mean_pct=("pnl_pct", "mean"),
+                                                                worst_pct=("pnl_pct", "min")).round(5).to_dict(orient="index"),
+                     "most_adverse": {**top.summary(), "by_type": top.by_asset_type.pnl.round(2).to_dict()},
+                     "sample_headlines": rsum.sort_values("timestamp").headline.tolist()},
+    }
+    return r, bt, st, worst, brief, rbt, top
 
 
 # ------------------------------------------------------------------ architecture
@@ -142,9 +172,9 @@ def architecture(path):
     box(ax, 13.6, 4.9, 2.6, 1.8, "Module A", "Index rebalancer\n15 stocks; decay, tilt,\n[2%, 15%] caps, turnover cap", fc=orange)
     box(ax, 13.6, 2.6, 2.6, 1.8, "Module B", "Stress tester, 40-asset\nbanking book; scenario\nshocks x impact / 10", fc=green)
     box(ax, 13.6, 0.2, 2.6, 1.85, "Dashboard", "app.py (Streamlit)\nsignals + live scoring,\nweights / NAV, stress P&L")
-    box(ax, 0.2, 0.2, 9.6, 1.2, "Synthetic data generator",
-        "scripts/generate_data.py -> text, prices (data/prices.csv), portfolio (data/portfolio.csv);\n"
-        "handwritten eval sets in data/eval/", fc=grey)
+    box(ax, 0.2, 0.2, 9.6, 1.2, "Data: synthetic + real",
+        "synthetic: scripts/generate_data.py (text, prices, 40-asset portfolio)  |  real: scripts/fetch_real_data.py\n"
+        "(22k Google News headlines, Yahoo Finance prices, PhraseBank + finance tweets; src/engine/real.py)", fc=grey)
     arrow(ax, (2.9, 5.7), (3.4, 5.7))
     arrow(ax, (2.9, 3.2), (3.4, 3.2))
     arrow(ax, (6.2, 4.45), (6.7, 4.45))
@@ -163,14 +193,14 @@ def architecture(path):
 
 
 # ------------------------------------------------------------------ result figures
-def fig_nav(bt, path):
+def fig_nav(bt, path, title="NAV, start = 100 (65 trading days, synthetic prices)"):
     fig, ax = plt.subplots(figsize=(7, 3.6))
     ax.plot(bt.nav.index, bt.nav.sentiment_index, color=SERIES[0], lw=2, label="Sentiment index")
     ax.plot(bt.nav.index, bt.nav.equal_weight, color=SERIES[1], lw=2, label="Equal-weight benchmark")
     for col, c in [("sentiment_index", SERIES[0]), ("equal_weight", SERIES[1])]:
         ax.annotate(f"{bt.nav[col].iloc[-1]:.1f}", (bt.nav.index[-1], bt.nav[col].iloc[-1]), xytext=(4, 0),
                     textcoords="offset points", va="center", fontsize=9, color=INK2)
-    ax.set_title("NAV, start = 100 (65 trading days, synthetic prices)")
+    ax.set_title(title)
     ax.legend(frameon=False, loc="lower left", fontsize=9)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
     fig.tight_layout()
@@ -198,9 +228,9 @@ def fig_weights(bt, path):
     plt.close(fig)
 
 
-def fig_stress(worst, brief, path):
-    fig, axes = plt.subplots(1, 2, figsize=(11, 3.8))
-    for ax, res, title in [(axes[0], worst, "Worst triggered event"), (axes[1], brief, "Brief example: equities -10%, rates +200bp")]:
+def fig_stress(panels, path):
+    fig, axes = plt.subplots(1, len(panels), figsize=(5.5 * len(panels), 3.8))
+    for ax, (res, title) in zip(np.atleast_1d(axes), panels):
         a = res.assets
         parts = [a.rate_pnl.sum(), a.spread_pnl.sum(), a.equity_pnl.sum()]
         labels = ["Before", "Rates", "Spreads", "Equity", "After"]
@@ -231,7 +261,7 @@ def slide(pdf, n, title, draw):
     fig.patch.set_facecolor("white")
     fig.text(0.045, 0.92, title, fontsize=24, fontweight="bold", color=INK, va="center")
     fig.add_artist(plt.Line2D([0.045, 0.955], [0.875, 0.875], color=SERIES[0], lw=2.5))
-    fig.text(0.045, 0.03, "S&P Global & Crisil Campus Hackathon 2026  |  Mehwish, VIT  |  all data synthetic",
+    fig.text(0.045, 0.03, "S&P Global & Crisil Campus Hackathon 2026  |  Mehwish, VIT  |  synthetic + real public data",
              fontsize=9, color=GREY)
     fig.text(0.955, 0.03, f"{n} / 7", fontsize=9, color=GREY, ha="right")
     draw(fig)
@@ -262,10 +292,28 @@ def stat(fig, x, y, value, label, color=INK):
     fig.text(x, y - 0.075, label, fontsize=10.5, color=INK2, va="top")
 
 
+def table(fig, rect, rows, header, col_widths, size=11, scale=1.8):
+    ax = fig.add_axes(rect)
+    ax.axis("off")
+    t = ax.table(cellText=rows, colLabels=header, loc="upper center", cellLoc="center", colWidths=col_widths)
+    t.auto_set_font_size(False)
+    t.set_fontsize(size)
+    t.scale(1, scale)
+    for (i, j), cell in t.get_celld().items():
+        cell.set_edgecolor(GRID)
+        if i == 0:
+            cell.set_text_props(fontweight="bold", color=INK)
+            cell.set_facecolor("#f4f4f2")
+    return t
+
+
 def deck(r, path):
-    e, c, a, b = r["engine"], r["corpus"], r["module_a"], r["module_b"]
+    e, c, a, b, rl = r["engine"], r["corpus"], r["module_a"], r["module_b"], r["real"]
     ma, mb = a["metrics"]["sentiment_index"], a["metrics"]["equal_weight"]
+    ra, rb = rl["module_a"]["metrics"]["sentiment_index"], rl["module_a"]["metrics"]["equal_weight"]
     oof, ho = e["synthetic_out_of_fold"], e["handwritten_holdout_20"]
+    tw, pb = rl["eval"]["twitter_test"], rl["eval"]["phrasebank_5fold"]
+    am = lambda m: f"acc {m['accuracy']:.2f} / F1 {m['macro_f1']:.2f}"
     with PdfPages(path) as pdf:
         def s1(fig):
             fig.text(0.045, 0.80, "Turning news & social chatter into structured risk signals", fontsize=17, color=INK2)
@@ -277,12 +325,13 @@ def deck(r, path):
             ], size=13, width=62)
             fig.text(0.53, 0.64, "Approach", fontsize=15, fontweight="bold", color=INK)
             bullets(fig, 0.53, 0.59, [
-                "One NLP Risk Engine: 2 sources in, one signal per text out: sentiment (-1..1), event type, impact (1..10).",
+                "One NLP Risk Engine: news + social text in, one signal per text out: sentiment (-1..1), event type, impact (1..10).",
                 "Signals published via file, REST API and an in-process pub/sub bus.",
                 "Both downstream modules built on the bus:",
                 "  A: sentiment-tilted index of 15 S&P 100 stocks",
                 "  B: event-triggered stress test of a 40-asset wholesale banking book",
-                "One Streamlit dashboard for the live demo.",
+                f"Built on synthetic data, then tested on REAL public data: {rl['headlines_raw']:,} Google News headlines, "
+                f"Yahoo Finance prices, {tw['n'] + pb['n']:,} labelled real texts.",
             ], size=13, width=58)
         slide(pdf, 1, "NLP Risk Engine + Index Rebalancer + Stress Tester", s1)
 
@@ -291,134 +340,117 @@ def deck(r, path):
 
         def s3(fig):
             bullets(fig, 0.045, 0.82, [
-                f"Ingestion: {c['by_source']['news']:,} news + {c['by_source']['social']:,} social texts; social cleaned (RT, URLs, @, #); "
-                f"entity linking by cashtag/name/alias -> {c['by_scope']['company']:,} company + {c['by_scope']['market']:,} market-wide signals.",
-                "Company names masked to 'company' so models learn language, not 'AAPL is usually positive'.",
-                "Sentiment: finance-tuned VADER lexicon blended with TF-IDF ridge. Event: TF-IDF + logistic regression. "
-                "Impact: regressor on text + source type.",
-                "Every signal is scored out-of-fold (5-fold), so modules never consume memorised training rows.",
-                "Tech: Python 3.13, pandas, scikit-learn, vaderSentiment, FastAPI, Streamlit, Plotly; 27 pytest tests.",
-            ], size=12.5, width=60)
-            tbl = [["Metric", "Synthetic (OOF)", "Holdout (20)"],
-                   ["Sentiment Pearson r", f"{oof['sentiment']['pearson_r']:.3f}", f"{ho['sentiment_blend']['pearson_r']:.3f}"],
-                   ["Sentiment 3-class acc", f"{oof['sentiment']['3class_acc']:.3f}", f"{ho['sentiment_blend']['3class_acc']:.3f}"],
-                   ["Event accuracy", f"{oof['event_accuracy']:.3f}", f"{ho['event_accuracy']:.3f}"],
-                   ["Impact MAE (1-10)", f"{oof['impact_mae']:.2f}", f"{ho['impact_mae']:.2f}"],
-                   ["Lexicon-only 3-class acc", "-", f"{ho['sentiment_lexicon_only']['3class_acc']:.3f}"]]
-            ax = fig.add_axes([0.56, 0.50, 0.40, 0.33])
-            ax.axis("off")
-            t = ax.table(cellText=tbl[1:], colLabels=tbl[0], loc="upper center", cellLoc="center", colWidths=[.4, .3, .3])
-            t.auto_set_font_size(False)
-            t.set_fontsize(11.5)
-            t.scale(1, 2.0)
-            for (i, j), cell in t.get_celld().items():
-                cell.set_edgecolor(GRID)
-                if i == 0:
-                    cell.set_text_props(fontweight="bold", color=INK)
-                    cell.set_facecolor("#f4f4f2")
-            fig.text(0.56, 0.47, textwrap.fill(
-                "Honest read: synthetic scores are high because test text shares the generator's templates. The 20 "
-                "handwritten holdout texts (never tuned on) are the real generalisation check: event 0.90, sentiment "
-                f"r {ho['sentiment_blend']['pearson_r']:.2f}. On them the plain lexicon (3-class "
-                f"{ho['sentiment_lexicon_only']['3class_acc']:.2f}) beats the blend ({ho['sentiment_blend']['3class_acc']:.2f}): "
-                "the ML part overfits template wording.", 62), fontsize=10.5, color=INK2, va="top", linespacing=1.4)
+                f"Ingestion: 2 sources -> one schema; social cleaning (RT, URLs, @, #); entity linking by cashtag/name/alias; "
+                f"company names masked so models read language, not tickers.",
+                "Sentiment: finance-tuned VADER lexicon + TF-IDF model. Event: TF-IDF + logistic regression (8 labels), "
+                "keyword fallback when unsure. Impact: TF-IDF ridge.",
+                "Synthetic corpus scored out-of-fold (5-fold): sentiment r 0.908, event accuracy 0.969, but test text shares "
+                "the generator's templates, so this is the optimistic number.",
+                "Real text exposed the gap: the synthetic-trained sentiment model is no better than always guessing "
+                "'neutral'. Retraining on real labelled text fixed it.",
+                "Tech: Python 3.13, pandas, scikit-learn, vaderSentiment, FastAPI, Streamlit, Plotly; 32 pytest tests.",
+            ], size=12, width=56, gap=0.006)
+            rows = [["Real tweets (held-out)", f"{tw['n']:,}", am(tw["synthetic_trained_engine"]), am(tw["real_trained_label"])],
+                    ["Real news (PhraseBank, 5-fold)", f"{pb['n']:,}", am(pb["synthetic_trained_engine"]), am(pb["real_trained_label"])],
+                    ["'Neutral' baseline: tweets / news", "", f"acc {tw['majority_class_baseline']['accuracy']:.2f} / "
+                     f"{pb['majority_class_baseline']['accuracy']:.2f}", ""],
+                    ["Handwritten holdout: event acc.", "20", f"{ho['event_accuracy']:.2f}", ""]]
+            table(fig, [0.50, 0.55, 0.47, 0.28], rows, ["Sentiment test set", "n", "Synthetic-trained", "Real-trained"],
+                  [.38, .08, .27, .27], size=10, scale=2.0)
+            fig.text(0.50, 0.50, textwrap.fill(
+                "Lesson: a model that looks excellent on synthetic data can fail on real wording. Measuring on held-out real "
+                "text (official splits; blend weight chosen by CV on training data only) is what made the engine credible.",
+                64), fontsize=10.5, color=INK2, va="top", linespacing=1.4)
         slide(pdf, 3, "Implementation: the NLP Risk Engine", s3)
 
         def s4(fig):
-            image(fig, FIG / "weights.png", [0.03, 0.40, 0.47, 0.46])
-            image(fig, FIG / "nav.png", [0.51, 0.40, 0.47, 0.46])
-            stat(fig, 0.05, 0.36, f"{ma['total_return']:+.1%}", f"index total return (EW {mb['total_return']:+.1%})", POS)
-            stat(fig, 0.25, 0.36, f"{ma['sharpe']:.2f}", f"Sharpe (EW {mb['sharpe']:.2f})")
-            stat(fig, 0.40, 0.36, f"{ma['max_drawdown']:.1%}", f"max drawdown (EW {mb['max_drawdown']:.1%})")
-            stat(fig, 0.58, 0.36, f"{ma['avg_daily_turnover']:.1%}", "avg one-way turnover / day")
-            pl = a["placebo_shuffled_sentiment_total_return"]
-            bullets(fig, 0.05, 0.20, [
-                f"Rule: decayed (36h) impact x source weighted sentiment -> weight = 1/15 x exp(1.5 x score), bounded "
-                f"[2%, 15%], max 20% turnover/day; set at close t, earns t+1 (no look-ahead). Placebo with shuffled "
-                f"sentiment: mean {pl['mean']:+.1%} over {pl['runs']} runs.",
-                "Caveat: synthetic prices were generated from the same events as the text, so this outperformance is "
-                "partly circular: it proves the plumbing works, not that the signal has alpha.",
-            ], size=11.5, width=118, gap=0.004)
+            image(fig, FIG / "nav.png", [0.03, 0.45, 0.47, 0.41])
+            image(fig, FIG / "nav_real.png", [0.51, 0.45, 0.47, 0.41])
+            ps, pr = a["placebo_shuffled_sentiment_total_return"], rl["module_a"]["placebo_shuffled_sentiment_total_return"]
+            rows = [["Synthetic text + synthetic prices", f"{ma['total_return']:+.1%}", f"{mb['total_return']:+.1%}",
+                     f"{ps['mean']:+.1%}", f"{ma['sharpe']:.2f} / {mb['sharpe']:.2f}"],
+                    ["REAL headlines + REAL prices", f"{ra['total_return']:+.1%}", f"{rb['total_return']:+.1%}",
+                     f"{pr['mean']:+.1%} ({pr['min']:+.1%}..{pr['max']:+.1%})", f"{ra['sharpe']:.2f} / {rb['sharpe']:.2f}"]]
+            table(fig, [0.05, 0.30, 0.90, 0.13], rows, ["Data", "Sentiment index", "Equal weight", "Shuffled-sentiment placebo",
+                                                     "Sharpe (index / EW)"], [.30, .15, .15, .24, .16], size=11, scale=1.7)
+            bullets(fig, 0.05, 0.215, [
+                "Rule: decayed (36h), impact x source-weighted sentiment -> weight = 1/15 x exp(1.5 x score), bounds [2%, 15%], "
+                "max 20% turnover/day, weights set at close t earn t+1 (no look-ahead; real headlines enter the next day).",
+                "Synthetic edge is circular (prices built from the same events). On real data the tilt does NOT beat equal weight: "
+                "public headlines are priced in fast. Reported as-is, no re-tuning on the test period.",
+            ], size=10.5, width=150, gap=0.0)
         slide(pdf, 4, "Results, Module A: sentiment-driven index rebalancing", s4)
 
         def s5(fig):
-            image(fig, FIG / "stress.png", [0.03, 0.38, 0.62, 0.48])
-            w = b["worst"]
-            bullets(fig, 0.67, 0.83, [
-                f"{b['high_impact_signals']} signals with impact > 7 -> {b['triggers']} distinct stress tests "
-                f"(24h cooldown per event+ticker; positive idiosyncratic news skipped).",
-                f"Worst: {w['event_type']} on {w['ticker']} (impact {w['impact']:.0f}): "
-                f"{w['pnl_pct']:+.2%} = -${-w['pnl']:,.1f}m on a ${b['portfolio_value']:,.0f}m book.",
-                f"Brief's example (-10% equity, +200bp): {b['brief_example']['pnl_pct']:+.2%}; swaps and puts "
-                f"offset ${b['brief_example']['by_type'].get('Derivative', 0):+.1f}m.",
-                f"Valuing derivatives on market value instead of risk notional would show only "
-                f"${b['brief_example_naive_mv']['derivative_pnl']:+.1f}m of hedge: the naive approach mis-states risk.",
-            ], size=11.5, width=42, gap=0.006)
-            rows = sorted(b["by_event"].items(), key=lambda kv: kv[1]["mean_pct"])
-            tbl = [[k, f"{v['n']}", f"{v['mean_pct']:+.2%}", f"{v['worst_pct']:+.2%}"] for k, v in rows]
-            ax = fig.add_axes([0.06, 0.07, 0.56, 0.29])
-            ax.axis("off")
-            t = ax.table(cellText=tbl, colLabels=["Event type", "Triggers", "Mean P&L", "Worst P&L"], loc="upper center",
-                         cellLoc="center", colWidths=[.4, .2, .2, .2])
-            t.auto_set_font_size(False)
-            t.set_fontsize(10)
-            t.scale(1, 1.3)
-            for (i, j), cell in t.get_celld().items():
-                cell.set_edgecolor(GRID)
-                if i == 0:
-                    cell.set_text_props(fontweight="bold")
-                    cell.set_facecolor("#f4f4f2")
+            image(fig, FIG / "stress.png", [0.02, 0.43, 0.96, 0.43])
+            w, t = b["worst"], rl["module_b"]["most_adverse"]
+            sb, rs = b["suppressed"], rl["module_b"]["suppressed"]
+            bullets(fig, 0.045, 0.39, [
+                f"Trigger = impact > 7, confident event label (>= 0.60), adverse sentiment, 24h cooldown per event+ticker. "
+                f"Synthetic: {b['high_impact_signals']} high-impact signals -> {b['triggers']} tests. Real: {rl['impact_gt7']} -> "
+                f"{rl['module_b']['triggers']} (the confidence rule removed {rs['low_confidence']} false alarms, e.g. a lifestyle "
+                "story about a 'default setting').",
+                f"Worst synthetic: {w['event_type']} on {w['ticker']} (impact {w['impact']:.0f}) {w['pnl_pct']:+.2%} = "
+                f"-${-w['pnl']:,.1f}m on a ${b['portfolio_value']:,.0f}m book. Real: '{t['headline']}' -> {t['pnl_pct']:+.2%}.",
+                f"Brief's example (-10% equity, +200bp): {b['brief_example']['pnl_pct']:+.2%}; swaps and puts offset "
+                f"${b['brief_example']['by_type'].get('Derivative', 0):+.1f}m. Valued on market value instead of risk notional "
+                f"the hedge shows only ${b['brief_example_naive_mv']['derivative_pnl']:+.1f}m: the naive approach mis-states risk.",
+            ], size=11.5, width=135, gap=0.004)
         slide(pdf, 5, "Results, Module B: event-triggered stress testing", s5)
 
         def s6(fig):
             fig.text(0.045, 0.82, "Domain impact", fontsize=15, fontweight="bold", color=INK)
             bullets(fig, 0.045, 0.77, [
                 "Portfolio managers: a transparent, rules-based tilt that reacts within one close to news flow, with turnover and concentration limits a risk committee can sign off.",
-                "Risk / treasury desks: every high-impact headline becomes an immediate, explainable 'what does this do to our book' number, broken down by rates, credit and equity and by asset type and sector.",
-                "One engine, many consumers: the pub/sub contract lets new modules (limits monitoring, alerts) subscribe without touching the NLP code.",
-            ], size=12.5, width=55)
+                "Risk / treasury desks: every high-impact headline becomes an immediate, explainable 'what does this do to our book' number, by rates / credit / equity, asset type and sector.",
+                "On real news it flagged the US-Iran war, Russia sanctions, the US-Canada trade war and Fed rate hikes as stress events.",
+                "One engine, many consumers: new modules subscribe to the bus without touching the NLP code.",
+            ], size=12, width=55, gap=0.008)
             fig.text(0.53, 0.82, "Challenges", fontsize=15, fontweight="bold", color=INK)
             bullets(fig, 0.53, 0.77, [
-                "No labelled real-time feed: built a synthetic generator plus 55 handwritten texts to measure generalisation honestly.",
-                "Entity linking & leakage: masking company names so models read the language.",
-                "Look-ahead: signals after 16:00 roll to the next rebalance; tested explicitly.",
-                f"Alert storms: {b['high_impact_signals']} raw hits -> {b['triggers']} triggers via strict threshold, cooldown and adverse-only rules.",
+                "Synthetic-to-real gap: great synthetic scores, coin-flip on real text -> retrained on real labelled data.",
+                "Alert storms and false alarms: strict threshold, confidence and adverse-only rules, cooldown.",
+                "Look-ahead: signals after 16:00 roll to the next close; real headlines enter the next day; tested explicitly.",
+                "Data access: GDELT rate-limited us (HTTP 429), so we used Google News RSS for the same publishers.",
                 "Derivatives: P&L on risk notional, not ~0 market value; sign tests for swaps, CDS, puts.",
-            ], size=12.5, width=55)
+            ], size=12, width=55, gap=0.008)
         slide(pdf, 6, "Domain impact and challenges", s6)
 
         def s7(fig):
             fig.text(0.045, 0.82, "Limitations (stated plainly)", fontsize=15, fontweight="bold", color=INK)
             bullets(fig, 0.045, 0.77, [
-                "All data is synthetic. Text, prices and portfolio come from scripts/generate_data.py.",
-                "Prices were generated from the same events as the text, so the Module A backtest is partly circular.",
-                "Engine generalisation is measured on only 20 handwritten holdout texts.",
-                "Impact learned template intensity words: 'War breaks out in the Middle East; oil spikes...' scores only 5.7.",
+                "Event and impact models are trained on synthetic labels only; on real text impact keys on dramatic words.",
+                "Real backtest covers 64 trading days and 15 stocks: far too short to claim (or rule out) alpha.",
+                "The banking portfolio is synthetic; Google News timestamps are often date-only (handled conservatively).",
                 "Stress model is first-order (duration / beta): no convexity, vega, correlations, rating migration or default loss.",
                 "Scenario sizes are expert judgement, not calibrated to history.",
-            ], size=12.5, width=55)
+            ], size=12, width=55, gap=0.008)
             fig.text(0.53, 0.82, "Next steps", fontsize=15, fontweight="bold", color=INK)
             bullets(fig, 0.53, 0.77, [
-                "Plug in real feeds (GDELT, NewsAPI, Kaggle stock tweets) behind the same ingest schema.",
-                "Fine-tune a finance transformer (e.g. FinBERT) for sentiment and events; compare vs the lexicon baseline.",
-                "Evaluate Module A on real prices (yfinance), with transaction costs and an event-study of signal decay.",
+                "Label real headlines for event type and learn impact from actual price reactions (event study).",
+                "Fine-tune a finance transformer (e.g. FinBERT) and compare against the current real-trained model.",
+                "Longer real backtest with intraday prices and transaction costs; test faster signal decay.",
                 "Calibrate shocks to historical episodes; add convexity, correlated factor shocks and credit migration.",
-                "Replace the in-process bus with Kafka; stream signals to the dashboard live.",
-            ], size=12.5, width=55)
+                "Replace the in-process bus with Kafka and stream live news into the dashboard.",
+            ], size=12, width=55, gap=0.008)
         slide(pdf, 7, "Limitations and next steps", s7)
 
 
 def main():
     DOCS.mkdir(exist_ok=True)
     FIG.mkdir(exist_ok=True)
-    r, bt, st, worst, brief = compute()
+    r, bt, st, worst, brief, rbt, top = compute()
     (DOCS / "results.json").write_text(json.dumps(r, indent=2, default=str))
     architecture(DOCS / "architecture.png")
     fig_nav(bt, FIG / "nav.png")
+    fig_nav(rbt, FIG / "nav_real.png", f"NAV, start = 100 ({len(rbt.weights)} trading days, REAL Yahoo prices)")
     fig_weights(bt, FIG / "weights.png")
-    fig_stress(worst, brief, FIG / "stress.png")
+    fig_stress([(worst, "Synthetic: worst triggered event"), (top, "Real headline: most adverse trigger"),
+                (brief, "Brief example: -10% equity, +200bp")], FIG / "stress.png")
     deck(r, DOCS / "presentation.pdf")
-    print(json.dumps({k: r[k] for k in ["corpus", "module_a", "module_b"]}, indent=1, default=str)[:6000])
+    print(json.dumps({k: r[k] for k in ["corpus", "module_b"]}, indent=1, default=str)[:3000])
+    print(json.dumps({k: v for k, v in r["real"].items() if k != "module_b"} | {"module_b": {
+        k: v for k, v in r["real"]["module_b"].items() if k != "sample_headlines"}}, indent=1, default=str)[:6000])
 
 
 if __name__ == "__main__":

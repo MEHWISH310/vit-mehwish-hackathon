@@ -268,19 +268,20 @@
       "Loan": 1173.7
     },
     "high_impact_signals": 369,
-    "triggers": 248,
+    "triggers": 238,
     "suppressed": {
       "below_threshold": 45,
+      "low_confidence": 0,
       "no_scenario": 0,
-      "not_adverse": 77,
-      "cooldown": 44
+      "not_adverse": 88,
+      "cooldown": 43
     },
     "by_event": {
       "Credit Event": {
-        "n": 54,
-        "mean_pct": -0.04515,
+        "n": 48,
+        "mean_pct": -0.04566,
         "worst_pct": -0.0573,
-        "mean_pnl": -94.6999
+        "mean_pnl": -95.76783
       },
       "Earnings": {
         "n": 48,
@@ -289,16 +290,16 @@
         "mean_pnl": -4.87381
       },
       "Geopolitical": {
-        "n": 23,
-        "mean_pct": -0.02607,
+        "n": 21,
+        "mean_pct": -0.02637,
         "worst_pct": -0.03174,
-        "mean_pnl": -54.67763
+        "mean_pnl": -55.31994
       },
       "Macroeconomic": {
-        "n": 23,
-        "mean_pct": -0.03228,
+        "n": 21,
+        "mean_pct": -0.03235,
         "worst_pct": -0.03768,
-        "mean_pnl": -67.70151
+        "mean_pnl": -67.86353
       },
       "Merger/Acquisition": {
         "n": 20,
@@ -372,7 +373,7 @@
         "idio_equity_pct": 0.0,
         "idio_spread_bp": 0.0,
         "ticker": "",
-        "adverse_only": false,
+        "adverse_only": true,
         "rationale": "Risk-off: equities sell off, flight to quality pulls yields down, credit widens"
       },
       "Macroeconomic": {
@@ -382,7 +383,7 @@
         "idio_equity_pct": 0.0,
         "idio_spread_bp": 0.0,
         "ticker": "",
-        "adverse_only": false,
+        "adverse_only": true,
         "rationale": "Inflation / hawkish surprise: rates up, equities down, spreads wider"
       },
       "Credit Event": {
@@ -392,7 +393,7 @@
         "idio_equity_pct": -15,
         "idio_spread_bp": 300,
         "ticker": "",
-        "adverse_only": false,
+        "adverse_only": true,
         "rationale": "Downgrade/default: contagion in credit, name-specific gap lower"
       },
       "Regulatory/Legal": {
@@ -435,6 +436,304 @@
         "adverse_only": true,
         "rationale": "Failed launch / recall: name-specific"
       }
+    }
+  },
+  "real": {
+    "eval": {
+      "lexicon_weight_cv_on_twitter_train": {
+        "chosen": 0.15,
+        "macro_f1_by_weight": {
+          "0.0": 0.7153,
+          "0.15": 0.7187,
+          "0.3": 0.6969,
+          "0.5": 0.6357
+        }
+      },
+      "twitter_test": {
+        "n": 2388,
+        "majority_class_baseline": {
+          "accuracy": 0.656,
+          "macro_f1": 0.264
+        },
+        "lexicon_only": {
+          "accuracy": 0.546,
+          "macro_f1": 0.502
+        },
+        "synthetic_trained_engine": {
+          "accuracy": 0.589,
+          "macro_f1": 0.524
+        },
+        "real_trained_score": {
+          "accuracy": 0.795,
+          "macro_f1": 0.746
+        },
+        "real_trained_label": {
+          "accuracy": 0.828,
+          "macro_f1": 0.77
+        }
+      },
+      "phrasebank_5fold": {
+        "n": 2264,
+        "majority_class_baseline": {
+          "accuracy": 0.614,
+          "macro_f1": 0.254
+        },
+        "lexicon_only": {
+          "accuracy": 0.575,
+          "macro_f1": 0.477
+        },
+        "synthetic_trained_engine": {
+          "accuracy": 0.609,
+          "macro_f1": 0.487
+        },
+        "real_trained_score": {
+          "accuracy": 0.861,
+          "macro_f1": 0.832
+        },
+        "real_trained_label": {
+          "accuracy": 0.89,
+          "macro_f1": 0.858
+        }
+      },
+      "real_headlines": {
+        "n_signals": 20437,
+        "by_scope": {
+          "company": 13875,
+          "market": 6562
+        },
+        "by_event": {
+          "Other": 5731,
+          "Geopolitical": 2688,
+          "Earnings": 2477,
+          "Credit Event": 2300,
+          "Macroeconomic": 2238,
+          "Product Launch": 2205,
+          "Merger/Acquisition": 1828,
+          "Regulatory/Legal": 970
+        },
+        "impact_gt7": 561
+      }
+    },
+    "headlines_raw": 22442,
+    "publishers": 2984,
+    "signals": 20437,
+    "by_scope": {
+      "company": 13875,
+      "market": 6562
+    },
+    "impact_gt7": 561,
+    "price_days": 64,
+    "module_a": {
+      "metrics": {
+        "sentiment_index": {
+          "total_return": 0.07044326041861337,
+          "ann_vol": 0.10451318613037784,
+          "sharpe": 2.658174770866987,
+          "max_drawdown": -0.023489177438598796,
+          "avg_daily_turnover": 0.03782963867897374
+        },
+        "equal_weight": {
+          "total_return": 0.07860020794639588,
+          "ann_vol": 0.10677779075113616,
+          "sharpe": 2.888670242890866,
+          "max_drawdown": -0.0250616599753265
+        },
+        "signals_consumed": 13624
+      },
+      "days": 64,
+      "sensitivity": [
+        {
+          "tilt": 0.75,
+          "half_life_h": 12,
+          "total_return": 0.07500270153362654,
+          "ann_vol": 0.10609593025736906,
+          "sharpe": 2.780469996832927,
+          "max_drawdown": -0.02333518466406781,
+          "avg_daily_turnover": 0.035024529795646756
+        },
+        {
+          "tilt": 0.75,
+          "half_life_h": 36,
+          "total_return": 0.07470479738332947,
+          "ann_vol": 0.1055035129126565,
+          "sharpe": 2.7849826599412877,
+          "max_drawdown": -0.02424182352872495,
+          "avg_daily_turnover": 0.01963560042340894
+        },
+        {
+          "tilt": 0.75,
+          "half_life_h": 96,
+          "total_return": 0.07559364309478034,
+          "ann_vol": 0.10528511960343565,
+          "sharpe": 2.8219849173211933,
+          "max_drawdown": -0.02484822009139076,
+          "avg_daily_turnover": 0.011742098965833296
+        },
+        {
+          "tilt": 1.5,
+          "half_life_h": 12,
+          "total_return": 0.07069772223013082,
+          "ann_vol": 0.1058089413369179,
+          "sharpe": 2.635876075316532,
+          "max_drawdown": -0.022729305525322818,
+          "avg_daily_turnover": 0.06961430395333448
+        },
+        {
+          "tilt": 1.5,
+          "half_life_h": 36,
+          "total_return": 0.07044326041861337,
+          "ann_vol": 0.10451318613037784,
+          "sharpe": 2.658174770866987,
+          "max_drawdown": -0.023489177438598796,
+          "avg_daily_turnover": 0.03782963867897374
+        },
+        {
+          "tilt": 1.5,
+          "half_life_h": 96,
+          "total_return": 0.07232162800241593,
+          "ann_vol": 0.10402267128602422,
+          "sharpe": 2.7377085117417175,
+          "max_drawdown": -0.024665844591231112,
+          "avg_daily_turnover": 0.020515759645712804
+        },
+        {
+          "tilt": 3.0,
+          "half_life_h": 12,
+          "total_return": 0.061231499877109075,
+          "ann_vol": 0.10667969267378699,
+          "sharpe": 2.2819183408435344,
+          "max_drawdown": -0.024761959889418206,
+          "avg_daily_turnover": 0.13427475594055774
+        },
+        {
+          "tilt": 3.0,
+          "half_life_h": 36,
+          "total_return": 0.06265821143397576,
+          "ann_vol": 0.10346040508604987,
+          "sharpe": 2.4017070530457025,
+          "max_drawdown": -0.02218079425859043,
+          "avg_daily_turnover": 0.07398018616029384
+        },
+        {
+          "tilt": 3.0,
+          "half_life_h": 96,
+          "total_return": 0.06629007973521284,
+          "ann_vol": 0.10221953934364356,
+          "sharpe": 2.5632675814883488,
+          "max_drawdown": -0.02440028055813659,
+          "avg_daily_turnover": 0.03807627309273622
+        }
+      ],
+      "placebo_shuffled_sentiment_total_return": {
+        "mean": 0.07848055279673259,
+        "min": 0.06960991361707958,
+        "max": 0.0839647082858237,
+        "runs": 20
+      }
+    },
+    "module_b": {
+      "triggers": 51,
+      "suppressed": {
+        "below_threshold": 84,
+        "low_confidence": 458,
+        "no_scenario": 0,
+        "not_adverse": 36,
+        "cooldown": 16
+      },
+      "by_event": {
+        "Earnings": {
+          "n": 2,
+          "mean_pct": -0.00247,
+          "worst_pct": -0.00339
+        },
+        "Geopolitical": {
+          "n": 29,
+          "mean_pct": -0.02327,
+          "worst_pct": -0.02444
+        },
+        "Macroeconomic": {
+          "n": 18,
+          "mean_pct": -0.02791,
+          "worst_pct": -0.02864
+        },
+        "Merger/Acquisition": {
+          "n": 2,
+          "mean_pct": -0.00211,
+          "worst_pct": -0.00217
+        }
+      },
+      "most_adverse": {
+        "scenario": "Macroeconomic",
+        "timestamp": "2026-08-01 09:00:00",
+        "event_type": "Macroeconomic",
+        "ticker": "",
+        "impact": 7.3,
+        "sentiment": -0.482,
+        "headline": "US economy grows sluggish 1.5% in second quarter as inflation tops Fed target",
+        "value_before": 2097.5,
+        "value_after": 2039.799064644,
+        "pnl": -57.700935355999995,
+        "pnl_pct": -0.027509385151847435,
+        "by_type": {
+          "Bond": -44.52,
+          "Loan": -36.39,
+          "Equity": -10.57,
+          "Derivative": 33.77
+        }
+      },
+      "sample_headlines": [
+        "U.S. Strikes Iran and Reimposes Sanctions in Retaliation for Tanker Attacks",
+        "Inflation eased in June, helping Fed's Warsh delay potential rate hikes",
+        "No end in sight for new Iran war",
+        "Warsh vows to tackle inflation in first congressional testimony as Fed chairman",
+        "Opinion | The Tariff Danger in Graham\u2019s Russia Sanctions Bill",
+        "Iran war hurting U.S. allies in region, former Jordanian foreign minister says",
+        "Canadian inflation eases in June",
+        "Houthis announce Saudi naval blockade, threatening new front in US-Iran war",
+        "Tesla, Alphabet lose hundreds of billions in value in post-earnings stock plunge",
+        "Economists Stick to Fed Rate Cut Call as Markets Price In Hikes",
+        "What's in the EU's 21st package of sanctions against Russia",
+        "Russia, Iran Sanctions Bill Clears Key Hurdle in US Senate",
+        "PCE Inflation Eased in June",
+        "US economy grows sluggish 1.5% in second quarter as inflation tops Fed target",
+        "Iran sets pace in war with Donald Trump",
+        "Trump administration refunds $100bn in \u2018liberation day\u2019 tariffs",
+        "Ghana's inflation eases in July, first decrease since March",
+        "Gaza: 300 children killed in 300 days of Israeli-Hamas \u2018ceasefire\u2019",
+        "Trump admin refunds $100 billion in 'liberation day' tariffs",
+        "Watch Inflation Data Keeps Fed Rate Hike in Play",
+        "Trump Uses Deceptive Chart in False Inflation Boast",
+        "Experts: RAF card in Moscow likely violates U.S. sanctions",
+        "Nigeria Inflation Eases in July, Boosting Case for Rate Cut",
+        "EU plans most far-reaching sanctions on Russia in coming months",
+        "US vows 'toughest sanctions in history' against Iran, oil prices surge",
+        "Amazon driver strikes 71-year-old man in California gas station in newly released video",
+        "Trump says he'll impose new 50% tariffs on Canadian cars and steel in January, escalating trade war",
+        "Canada retaliates in rapidly escalating U.S. trade war",
+        "With the US and Canada locked in a trade war, fears of a recession lurk",
+        "Fed's Warsh: Interest rate increases in play if inflation doesn't fall",
+        "What new tariff walls in U.S.-Canada trade war mean for the economy's critical metals",
+        "German inflation accelerates in August, core stabilises",
+        "Canada targets US metals in looming retaliatory tariffs",
+        "Tariffs in Flux: 5 Strategies for Managing Risk and Compliance",
+        "Apple Locks In NAND Memory Deal: 3-5 Years, No Cap [2026]",
+        "US Sanctions All Remaining Iranian Airlines In Sweeping Aviation Crackdown",
+        "August Inflation Data Keeps a September Rate Hike in Play: What to Know",
+        "Yemen's Iranian-backed Houthis seize an island in a key strait, opening a new front in the Iran war",
+        "Argentina's Milei plans bill to toughen sanctions against firms operating in Falklands",
+        "Yemen: Escalating conflict drives new displacement and refugee arrivals in Djibouti",
+        "Fed raises rates in search of 'timelier' drop in inflation, sees more tightening ahead",
+        "New US sanctions bill on Russia puts India's Modi in a bind",
+        "'Washington Post' finds discrepancies in Iran war death numbers",
+        "Fed Raises Interest Rates in Push for \u2018Timelier\u2019 Retreat in Inflation",
+        "Shale Tycoon Says Exxon CEO Betrayed Him in $60 Billion Deal",
+        "Collapsing currency and inflation leave families struggling in Sudan",
+        "Vladimir Putin only has two options in Ukraine: Total victory or endless war",
+        "Watchdog finds no criminality in Fed renovation that drew Trump\u2019s scrutiny",
+        "US targets Iran auto, rail and metals sectors in new sanctions blitz",
+        "Major brokerages expect next Fed rate hike in December",
+        "US Targets Russia's A7 Network In New Iran Sanctions Push"
+      ]
     }
   }
 }
