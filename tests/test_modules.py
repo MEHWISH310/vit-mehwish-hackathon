@@ -4,6 +4,7 @@ import pytest
 
 from src.modules.rebalancer import (RebalanceConfig, SentimentRebalancer, bound_weights, one_way_turnover,
                                     run_backtest)
+from src.modules.stress import SCENARIOS, Shock, StressTester, load_portfolio, run_event_stress, run_stress
 
 TICKERS = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG", "HHH", "III", "JJJ"]
 
@@ -91,3 +92,81 @@ def test_backtest_weights_earn_next_day_return():
 
 def test_turnover_helper():
     assert one_way_turnover([0.5, 0.5], [0.6, 0.4]) == pytest.approx(0.1)
+
+
+# ---------------- Module B ----------------
+
+@pytest.fixture(scope="module")
+def portfolio():
+    return load_portfolio()
+
+
+def _pnl(res, instrument):
+    return res.assets.loc[res.assets.instrument == instrument, "pnl"].sum()
+
+
+def test_portfolio_has_mixed_asset_types(portfolio):
+    assert {"Loan", "Bond", "Derivative", "Equity"} <= set(portfolio.asset_type)
+
+
+def test_zero_shock_zero_pnl(portfolio):
+    r = run_stress(portfolio, Shock())
+    assert r.pnl == 0 and r.value_after == pytest.approx(r.value_before)
+
+
+def test_rates_up_hurts_bonds_helps_pay_fixed_swaps(portfolio):
+    r = run_stress(portfolio, Shock(rate_bp=100))
+    assert (r.assets.loc[r.assets.asset_type == "Bond", "pnl"] < 0).all()
+    assert _pnl(r, "Pay-Fixed Interest Rate Swap") > 0
+
+
+def test_spread_widening_helps_cds_protection(portfolio):
+    r = run_stress(portfolio, Shock(spread_bp=100))
+    assert _pnl(r, "CDS Protection Bought") > 0
+    assert r.by_asset_type.loc["Loan", "pnl"] < 0
+
+
+def test_equity_drop_helps_puts_hurts_stocks(portfolio):
+    r = run_stress(portfolio, Shock(equity_pct=-10))
+    assert _pnl(r, "Equity Index Put Option") > 0 and _pnl(r, "Common Stock") < 0
+
+
+def test_rating_multiplier_and_idiosyncratic_shock(portfolio):
+    r = run_stress(portfolio, Shock(idio_equity_pct=-20, idio_spread_bp=100, ticker="GS"))
+    hit = r.assets[r.assets.pnl != 0]
+    assert set(hit.linked_ticker) == {"GS"} and set(hit.asset_type) == {"Bond", "Equity"}
+    gs_eq = r.assets[(r.assets.linked_ticker == "GS") & (r.assets.asset_type == "Equity")]
+    assert gs_eq.pnl.iloc[0] == pytest.approx(-0.20 * gs_eq.risk_notional.iloc[0])
+    # same spread move costs a B loan more per unit of spread risk than an A loan
+    r2 = run_stress(portfolio, Shock(spread_bp=100)).assets
+    per_unit = -r2.pnl / (r2.spread_duration * r2.risk_notional)
+    assert per_unit[r2.rating == "B"].iloc[0] > per_unit[r2.rating == "A"].iloc[0]
+
+
+def test_trigger_only_when_impact_strictly_above_threshold(portfolio):
+    st = StressTester(portfolio)
+    st.on_signal(_sig("2026-01-05 10:00", "", -0.8, impact=7.0, event_type="Geopolitical", scope="market"))
+    assert not st.triggers and st.suppressed["below_threshold"] == 1
+    st.on_signal(_sig("2026-01-05 11:00", "", -0.8, impact=7.1, event_type="Geopolitical", scope="market"))
+    assert len(st.triggers) == 1
+    res = st.triggers[0]
+    assert res.shock.equity_pct == pytest.approx(SCENARIOS["Geopolitical"].shock.equity_pct * 0.71)
+    assert res.pnl < 0 and res.signal["impact"] == 7.1
+
+
+def test_trigger_cooldown_and_adverse_only(portfolio):
+    st = StressTester(portfolio)
+    st.on_signal(_sig("2026-01-05 10:00", "GS", -0.9, impact=9, event_type="Credit Event"))
+    st.on_signal(_sig("2026-01-05 20:00", "GS", -0.9, impact=9, event_type="Credit Event"))  # same story
+    st.on_signal(_sig("2026-01-06 11:00", "GS", -0.9, impact=9, event_type="Credit Event"))  # >24h later
+    st.on_signal(_sig("2026-01-05 12:00", "AAPL", +0.9, impact=9, event_type="Earnings"))  # beat: no stress
+    st.on_signal(_sig("2026-01-05 12:00", "AAPL", -0.9, impact=9, event_type="Other"))  # no scenario
+    assert len(st.triggers) == 2
+    assert st.suppressed == {"below_threshold": 0, "no_scenario": 1, "not_adverse": 1, "cooldown": 1}
+
+
+def test_event_stress_over_bus(portfolio):
+    sig = pd.DataFrame([_sig("2026-01-05 10:00", "", -0.8, impact=9, event_type="Macroeconomic", scope="market"),
+                        _sig("2026-01-05 11:00", "", -0.8, impact=5, event_type="Macroeconomic", scope="market")])
+    st = run_event_stress(sig, portfolio)
+    assert len(st.triggers) == 1 and len(st.summary()) == 1
