@@ -1,0 +1,440 @@
+{
+  "engine": {
+    "synthetic_out_of_fold": {
+      "sentiment": {
+        "mae": 0.168,
+        "pearson_r": 0.908,
+        "3class_acc": 0.899
+      },
+      "event_accuracy": 0.969,
+      "event_macro_f1": 0.974,
+      "impact_mae": 0.85
+    },
+    "handwritten_dev_35": {
+      "sentiment_lexicon_only": {
+        "mae": 0.181,
+        "pearson_r": 0.889,
+        "3class_acc": 0.857
+      },
+      "sentiment_ml_only": {
+        "mae": 0.459,
+        "pearson_r": 0.546,
+        "3class_acc": 0.343
+      },
+      "sentiment_blend": {
+        "mae": 0.211,
+        "pearson_r": 0.89,
+        "3class_acc": 0.914
+      },
+      "event_accuracy": 0.914,
+      "impact_mae": 1.18
+    },
+    "handwritten_holdout_20": {
+      "sentiment_lexicon_only": {
+        "mae": 0.18,
+        "pearson_r": 0.884,
+        "3class_acc": 0.8
+      },
+      "sentiment_ml_only": {
+        "mae": 0.436,
+        "pearson_r": 0.338,
+        "3class_acc": 0.35
+      },
+      "sentiment_blend": {
+        "mae": 0.243,
+        "pearson_r": 0.878,
+        "3class_acc": 0.75
+      },
+      "event_accuracy": 0.9,
+      "impact_mae": 1.18
+    }
+  },
+  "corpus": {
+    "signals": 3974,
+    "by_source": {
+      "social": 2762,
+      "news": 1212
+    },
+    "by_scope": {
+      "company": 3547,
+      "market": 427
+    },
+    "by_event": {
+      "Other": 1577,
+      "Earnings": 454,
+      "Product Launch": 419,
+      "Merger/Acquisition": 419,
+      "Regulatory/Legal": 393,
+      "Credit Event": 285,
+      "Macroeconomic": 225,
+      "Geopolitical": 202
+    },
+    "impact_gt7": 369,
+    "impact_gt7_by_event": {
+      "Earnings": 92,
+      "Credit Event": 55,
+      "Merger/Acquisition": 49,
+      "Regulatory/Legal": 49,
+      "Product Launch": 47,
+      "Geopolitical": 43,
+      "Macroeconomic": 34
+    },
+    "span": [
+      "2026-07-06 06:04:00",
+      "2026-10-02 20:55:00"
+    ]
+  },
+  "module_a": {
+    "config": {
+      "half_life_h": 36.0,
+      "prior_strength": 3.0,
+      "tilt": 1.5,
+      "min_weight": 0.02,
+      "max_weight": 0.15,
+      "max_turnover": 0.2
+    },
+    "metrics": {
+      "sentiment_index": {
+        "total_return": 0.034263601784822795,
+        "ann_vol": 0.13360577861216813,
+        "sharpe": 1.0586651218789525,
+        "max_drawdown": -0.09305439090497258,
+        "avg_daily_turnover": 0.11053674510958919
+      },
+      "equal_weight": {
+        "total_return": -0.06777187653052141,
+        "ann_vol": 0.1287633309419806,
+        "sharpe": -2.081498712953402,
+        "max_drawdown": -0.14453621030828667
+      },
+      "signals_consumed": 3520
+    },
+    "days": 65,
+    "weight_min": 0.02,
+    "weight_max": 0.15000000000000002,
+    "max_turnover": 0.1999999999999999,
+    "final_weights": {
+      "JNJ": 0.1082,
+      "AAPL": 0.1025,
+      "WMT": 0.0966,
+      "META": 0.077,
+      "XOM": 0.0719,
+      "KO": 0.071,
+      "MSFT": 0.0651,
+      "NVDA": 0.0622,
+      "JPM": 0.0613,
+      "PFE": 0.0553,
+      "CVX": 0.0517,
+      "BAC": 0.05,
+      "AMZN": 0.0488,
+      "GS": 0.0452,
+      "GOOGL": 0.0331
+    },
+    "sensitivity": [
+      {
+        "tilt": 0.0,
+        "half_life_h": 12,
+        "total_return": -0.06777187653052152,
+        "ann_vol": 0.12876333094198064,
+        "sharpe": -2.0814987129534046,
+        "max_drawdown": -0.14453621030828678,
+        "avg_daily_turnover": 0.0051891745194284425
+      },
+      {
+        "tilt": 0.0,
+        "half_life_h": 36,
+        "total_return": -0.06777187653052152,
+        "ann_vol": 0.12876333094198064,
+        "sharpe": -2.0814987129534046,
+        "max_drawdown": -0.14453621030828678,
+        "avg_daily_turnover": 0.0051891745194284425
+      },
+      {
+        "tilt": 0.0,
+        "half_life_h": 96,
+        "total_return": -0.06777187653052152,
+        "ann_vol": 0.12876333094198064,
+        "sharpe": -2.0814987129534046,
+        "max_drawdown": -0.14453621030828678,
+        "avg_daily_turnover": 0.0051891745194284425
+      },
+      {
+        "tilt": 0.75,
+        "half_life_h": 12,
+        "total_return": -0.004938886733123038,
+        "ann_vol": 0.13111838229554235,
+        "sharpe": -0.08430321691755926,
+        "max_drawdown": -0.11432109046280858,
+        "avg_daily_turnover": 0.08858863330409028
+      },
+      {
+        "tilt": 0.75,
+        "half_life_h": 36,
+        "total_return": -0.01593969843907672,
+        "ann_vol": 0.130251249719215,
+        "sharpe": -0.42171149520495577,
+        "max_drawdown": -0.11665542184516775,
+        "avg_daily_turnover": 0.055980797382673086
+      },
+      {
+        "tilt": 0.75,
+        "half_life_h": 96,
+        "total_return": -0.031454920731808,
+        "ann_vol": 0.12967407117572746,
+        "sharpe": -0.9065134704858153,
+        "max_drawdown": -0.12205978451408639,
+        "avg_daily_turnover": 0.030295123802587948
+      },
+      {
+        "tilt": 1.5,
+        "half_life_h": 12,
+        "total_return": 0.05267654833712343,
+        "ann_vol": 0.13413752496893708,
+        "sharpe": 1.5733082992495615,
+        "max_drawdown": -0.08919406124705265,
+        "avg_daily_turnover": 0.16533853230703374
+      },
+      {
+        "tilt": 1.5,
+        "half_life_h": 36,
+        "total_return": 0.034263601784822795,
+        "ann_vol": 0.13360577861216813,
+        "sharpe": 1.0586651218789525,
+        "max_drawdown": -0.09305439090497258,
+        "avg_daily_turnover": 0.11053674510958919
+      },
+      {
+        "tilt": 1.5,
+        "half_life_h": 96,
+        "total_return": 0.004136591962656366,
+        "ann_vol": 0.13201413806455553,
+        "sharpe": 0.1879228636167199,
+        "max_drawdown": -0.10328238614101148,
+        "avg_daily_turnover": 0.06049617661718159
+      },
+      {
+        "tilt": 3.0,
+        "half_life_h": 12,
+        "total_return": 0.07198369642297031,
+        "ann_vol": 0.13613872306628683,
+        "sharpe": 2.0782571281212747,
+        "max_drawdown": -0.07797991145090544,
+        "avg_daily_turnover": 0.19149866998149112
+      },
+      {
+        "tilt": 3.0,
+        "half_life_h": 36,
+        "total_return": 0.0698370679669309,
+        "ann_vol": 0.1351598657857616,
+        "sharpe": 2.033894235403417,
+        "max_drawdown": -0.07638993888537293,
+        "avg_daily_turnover": 0.15348761873136735
+      },
+      {
+        "tilt": 3.0,
+        "half_life_h": 96,
+        "total_return": 0.04108472069703528,
+        "ann_vol": 0.13553697255344344,
+        "sharpe": 1.2365224171661315,
+        "max_drawdown": -0.08659119844604568,
+        "avg_daily_turnover": 0.09560412631251287
+      }
+    ],
+    "placebo_shuffled_sentiment_total_return": {
+      "mean": -0.06891486979216706,
+      "min": -0.08959249814859749,
+      "max": -0.052754361762710755,
+      "runs": 20
+    }
+  },
+  "module_b": {
+    "portfolio_value": 2097.5,
+    "portfolio_mix": {
+      "Loan": 14,
+      "Bond": 12,
+      "Derivative": 8,
+      "Equity": 6
+    },
+    "mv_by_type": {
+      "Bond": 761.8,
+      "Derivative": 15.3,
+      "Equity": 146.7,
+      "Loan": 1173.7
+    },
+    "risk_notional_by_type": {
+      "Bond": 761.8,
+      "Derivative": 901.9,
+      "Equity": 146.7,
+      "Loan": 1173.7
+    },
+    "high_impact_signals": 369,
+    "triggers": 248,
+    "suppressed": {
+      "below_threshold": 45,
+      "no_scenario": 0,
+      "not_adverse": 77,
+      "cooldown": 44
+    },
+    "by_event": {
+      "Credit Event": {
+        "n": 54,
+        "mean_pct": -0.04515,
+        "worst_pct": -0.0573,
+        "mean_pnl": -94.6999
+      },
+      "Earnings": {
+        "n": 48,
+        "mean_pct": -0.00232,
+        "worst_pct": -0.00419,
+        "mean_pnl": -4.87381
+      },
+      "Geopolitical": {
+        "n": 23,
+        "mean_pct": -0.02607,
+        "worst_pct": -0.03174,
+        "mean_pnl": -54.67763
+      },
+      "Macroeconomic": {
+        "n": 23,
+        "mean_pct": -0.03228,
+        "worst_pct": -0.03768,
+        "mean_pnl": -67.70151
+      },
+      "Merger/Acquisition": {
+        "n": 20,
+        "mean_pct": -0.00221,
+        "worst_pct": -0.0038,
+        "mean_pnl": -4.62945
+      },
+      "Product Launch": {
+        "n": 38,
+        "mean_pct": -0.00053,
+        "worst_pct": -0.00177,
+        "mean_pnl": -1.10177
+      },
+      "Regulatory/Legal": {
+        "n": 42,
+        "mean_pct": -0.00576,
+        "worst_pct": -0.00815,
+        "mean_pnl": -12.08822
+      }
+    },
+    "worst": {
+      "scenario": "Credit Event",
+      "timestamp": "2026-10-01 18:05:00",
+      "event_type": "Credit Event",
+      "ticker": "GS",
+      "impact": 10.0,
+      "sentiment": -0.92,
+      "headline": "Goldman Sachs warns of covenant breach as cash flow tightens in what analysts call a major shock. Analysts flagged downside risks and trimme",
+      "value_before": 2097.5,
+      "value_after": 1977.311671,
+      "pnl": -120.188329,
+      "pnl_pct": -0.057300752800953515,
+      "shock": {
+        "equity_pct": -6.0,
+        "rate_bp": -10.0,
+        "spread_bp": 150.0,
+        "idio_equity_pct": -15.0,
+        "idio_spread_bp": 300.0,
+        "ticker": "GS"
+      },
+      "by_type": {
+        "Loan": -63.22,
+        "Bond": -57.93,
+        "Equity": -12.61,
+        "Derivative": 13.58
+      }
+    },
+    "brief_example": {
+      "pnl": -70.52488000000001,
+      "pnl_pct": -0.03362330393325388,
+      "value_after": 2026.97512,
+      "by_type": {
+        "Bond": -82.99,
+        "Loan": -47.22,
+        "Equity": -18.1,
+        "Derivative": 77.79
+      },
+      "rate_pnl": -61.95538000000002,
+      "equity_pnl": -8.5695
+    },
+    "brief_example_naive_mv": {
+      "pnl": -146.79566,
+      "pnl_pct": -0.06998601191895114,
+      "derivative_pnl": 1.5188599999999999
+    },
+    "scenarios": {
+      "Geopolitical": {
+        "equity_pct": -12,
+        "rate_bp": -40,
+        "spread_bp": 100,
+        "idio_equity_pct": 0.0,
+        "idio_spread_bp": 0.0,
+        "ticker": "",
+        "adverse_only": false,
+        "rationale": "Risk-off: equities sell off, flight to quality pulls yields down, credit widens"
+      },
+      "Macroeconomic": {
+        "equity_pct": -8,
+        "rate_bp": 100,
+        "spread_bp": 60,
+        "idio_equity_pct": 0.0,
+        "idio_spread_bp": 0.0,
+        "ticker": "",
+        "adverse_only": false,
+        "rationale": "Inflation / hawkish surprise: rates up, equities down, spreads wider"
+      },
+      "Credit Event": {
+        "equity_pct": -6,
+        "rate_bp": -10,
+        "spread_bp": 150,
+        "idio_equity_pct": -15,
+        "idio_spread_bp": 300,
+        "ticker": "",
+        "adverse_only": false,
+        "rationale": "Downgrade/default: contagion in credit, name-specific gap lower"
+      },
+      "Regulatory/Legal": {
+        "equity_pct": -2,
+        "rate_bp": 0,
+        "spread_bp": 15,
+        "idio_equity_pct": -12,
+        "idio_spread_bp": 120,
+        "ticker": "",
+        "adverse_only": true,
+        "rationale": "Fine / probe / ruling: mostly hits the named company"
+      },
+      "Earnings": {
+        "equity_pct": -1,
+        "rate_bp": 0,
+        "spread_bp": 5,
+        "idio_equity_pct": -10,
+        "idio_spread_bp": 40,
+        "ticker": "",
+        "adverse_only": true,
+        "rationale": "Earnings miss / guidance cut: name-specific repricing"
+      },
+      "Merger/Acquisition": {
+        "equity_pct": 0,
+        "rate_bp": 0,
+        "spread_bp": 5,
+        "idio_equity_pct": -8,
+        "idio_spread_bp": 80,
+        "ticker": "",
+        "adverse_only": true,
+        "rationale": "Deal stress: leverage-funded acquisition or broken deal"
+      },
+      "Product Launch": {
+        "equity_pct": -0.5,
+        "rate_bp": 0,
+        "spread_bp": 0,
+        "idio_equity_pct": -7,
+        "idio_spread_bp": 25,
+        "ticker": "",
+        "adverse_only": true,
+        "rationale": "Failed launch / recall: name-specific"
+      }
+    }
+  }
+}
