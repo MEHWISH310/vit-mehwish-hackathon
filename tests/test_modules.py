@@ -190,6 +190,7 @@ def test_dashboard_runs_end_to_end():
     at.button[0].click().run()  # "Analyze" in the try-it-live box scores text with the saved model
     assert not at.exception, at.exception
     assert any(m.label == "Sentiment" for m in at.metric)
+    assert "TRIGGER" in at.info[0].value  # the pre-filled demo headline crosses the impact threshold
 
 
 def test_dashboard_explains_missing_signals(monkeypatch, tmp_path):

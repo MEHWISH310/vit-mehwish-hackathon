@@ -67,7 +67,7 @@ def load_engine():
 
 st.title("NLP Risk Engine: news & social text to risk signals")
 if not SIGNALS_PATH.exists():
-    st.error("No engine output found at `outputs/signals.csv`. Generate it first (takes about a minute):")
+    st.error("No engine output found at `outputs/signals.csv`. Generate it first (takes a few seconds):")
     st.code("python -m src.engine.pipeline", language="bash")
     st.stop()
 
@@ -127,7 +127,7 @@ with tab_engine:
                    "headline"]], width="stretch", hide_index=True)
 
     st.subheader("Try it live")
-    txt = st.text_area("Paste a headline or post", "Moody's downgrades Goldman Sachs to BBB- as trading losses mount")
+    txt = st.text_area("Paste a headline or post", "Goldman Sachs warns of covenant breach as losses mount, a major shock for credit markets")
     src = st.radio("Source type", ["news", "social"], horizontal=True)
     if st.button("Analyze"):
         if not MODEL_PATH.exists():
