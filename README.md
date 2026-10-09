@@ -16,6 +16,10 @@ The engine ingests **financial news** and **X/Twitter-style posts** into one sch
 
 **Built on synthetic data, then tested on real data.** The system was developed on a reproducible synthetic corpus, then run end to end on **real public data**: 22,442 dated Google News headlines from 2,984 publishers, Yahoo Finance prices for the same 15 stocks, and 4,652 human-labelled real financial texts (Financial PhraseBank and finance tweets). Real text exposed a generalisation gap: the synthetic-trained sentiment model was no better than always guessing "neutral". So the real-data mode retrains sentiment on real labelled text, raising held-out accuracy from 0.59 to 0.83 on tweets and from 0.61 to 0.89 on news. A Streamlit dashboard switches between both modes live.
 
+![Dashboard overview, real-data mode](docs/img/dashboard_overview.png)
+
+![Live scoring in the Risk Engine tab](docs/img/dashboard_engine.png)
+
 ## 2. Architecture & Tech Stack
 
 ![Architecture](docs/architecture.png)
@@ -32,7 +36,7 @@ The engine ingests **financial news** and **X/Twitter-style posts** into one sch
 | Real-data mode | `src/engine/real.py`, `scripts/fetch_real_data.py` | Fetches real headlines, prices and labelled text; evaluates and retrains sentiment; scores real headlines |
 | Module A | `src/modules/rebalancer.py` | `SentimentRebalancer`, `RebalanceConfig`, `run_backtest` |
 | Module B | `src/modules/stress.py` | `StressTester`, `SCENARIOS`, `run_stress` (any custom shock), `run_event_stress` |
-| Dashboard | `app.py` | Streamlit + Plotly, 3 tabs, sidebar switch between synthetic and real data |
+| Dashboard | `app.py`, `.streamlit/config.toml` | Streamlit + Plotly: Overview (story cards, live risk feed), Risk Engine (one-click live scoring, real-text accuracy), Module A, Module B; sidebar switch between synthetic and real data |
 | Docs | `scripts/make_docs.py` | regenerates `docs/results.json`, figures, `architecture.png`, `presentation.pdf` from a real run |
 
 **Tech stack:** Python 3.13, pandas, NumPy, scikit-learn, vaderSentiment, FastAPI + Uvicorn, Streamlit, Plotly, matplotlib, yfinance (data fetch only), pytest. Everything runs locally on CPU; no API keys are needed.
