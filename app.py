@@ -23,10 +23,23 @@ from src.modules.rebalancer import RebalanceConfig, run_backtest, top_drivers  #
 from src.modules.stress import PRESETS, SCENARIOS, Shock, load_portfolio, run_event_stress, run_stress  # noqa: E402
 from src.universe import DATA, load_universe  # noqa: E402
 
-# reference categorical palette (fixed order), diverging pair and neutral midpoint
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
-POS, NEG, MID = "#2a78d6", "#d03b3b", "#f0efec"
-DIVERGING = [[0, NEG], [0.5, MID], [1, POS]]
+from streamlit import config as st_config  # noqa: E402
+
+# design tokens per theme: flat colours only (no gradients), shared by the CSS, Streamlit's theme and Plotly
+THEMES = {
+    "Light": dict(base="light", bg="#f4f5f7", surface="#ffffff", surface2="#f0f2f5", border="#e2e5ea",
+                  text="#0f1419", muted="#566070", faint="#8b93a1", accent="#2563eb", accent_soft="#e8effd",
+                  pos="#2563eb", pos_soft="#e8effd", neg="#d92d20", neg_soft="#fdecea", warn="#b86e00",
+                  warn_soft="#fdf3e1", ok="#12805c", ok_soft="#e5f4ed", neutral_soft="#eef0f3", grid="#eceef2",
+                  mid="#eeeeec", series=["#2563eb", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300",
+                                         "#4a3aa7", "#e34948"]),
+    "Dark": dict(base="dark", bg="#0d1117", surface="#151b23", surface2="#1c232d", border="#29313d",
+                 text="#e6edf3", muted="#9ba6b4", faint="#6e7886", accent="#4f8ff7", accent_soft="#17294a",
+                 pos="#4f8ff7", pos_soft="#17294a", neg="#f2645a", neg_soft="#3b1c1b", warn="#e5a23a",
+                 warn_soft="#3a2b13", ok="#3fb984", ok_soft="#123222", neutral_soft="#222a35", grid="#222a35",
+                 mid="#2a313c", series=["#4f8ff7", "#f08a4b", "#2fc28d", "#f2b632", "#f08cb4", "#5cbf5c",
+                                        "#9d8cf2", "#f2645a"]),
+}
 PLURAL = {"Loan": "loans", "Bond": "bonds", "Derivative": "derivatives", "Equity": "equities"}
 SYNTHETIC, REAL_MODE = "Synthetic (generated text + prices)", "Real (Google News headlines + Yahoo Finance prices)"
 SOURCES = {  # signals file, prices file, trained engine, command that creates them
@@ -38,61 +51,129 @@ EXAMPLES = {  # one-click demo inputs: (text, source type)
     "Plain downgrade": ("Moody's downgrades Goldman Sachs to junk as trading losses mount", "news"),
     "Hawkish Fed": ("Fed signals surprise rate hike as inflation spikes to a 20-year high", "news"),
     "Ceasefire": ("Ceasefire in the Middle East lifts global risk appetite", "news"),
-    "Bullish tweet": ("$NVDA smashes earnings, raises guidance 🚀", "social"),
+    "Bullish tweet": ("$NVDA smashes earnings, raises guidance \U0001F680", "social"),
 }
 DEFAULT_TEXT = EXAMPLES["Credit shock"][0]
 
 st.set_page_config(page_title="NLP Risk Engine", page_icon=":bar_chart:", layout="wide")
+# the top-bar toggle copies its value into a plain key: the theme rerun below would otherwise drop the widget's state
+T = THEMES["Dark" if st.session_state.get("dark") else "Light"]
+SERIES = T["series"]
+POS, NEG, MID = T["pos"], T["neg"], T["mid"]
+DIVERGING = [[0, NEG], [0.5, MID], [1, POS]]
 
-st.markdown("""
+# Streamlit sends its theme when a run starts, so switch the config and rerun once to restyle the native widgets
+_native = {"base": T["base"], "primaryColor": T["accent"], "backgroundColor": T["bg"],
+           "secondaryBackgroundColor": T["surface"], "textColor": T["text"], "borderColor": T["border"],
+           "linkColor": T["accent"], "dataframeHeaderBackgroundColor": T["surface2"]}
+if any(st_config.get_option(f"theme.{k}") != v for k, v in _native.items()):
+    for k, v in _native.items():
+        st_config.set_option(f"theme.{k}", v)
+    st.rerun()
+
+_vars = "".join(f"--{k.replace('_', '-')}:{v};" for k, v in T.items() if isinstance(v, str) and v.startswith("#"))
+_svg = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>{}</svg>"
+SUN = _svg.format("<g fill='none' stroke='%23f59e0b' stroke-width='2.4' stroke-linecap='round'><circle cx='12' cy='12' "
+                  "r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4"
+                  "M17.7 6.3l1.4-1.4'/></g>")
+MOON = _svg.format("<path fill='%23fbbf24' d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/>")
+TOGGLE = ".st-key-dark_mode label"  # the theme switch: track = first div, knob = the div inside it
+st.markdown(f"""
 <style>
-.block-container {padding-top: 1.6rem; max-width: 1400px;}
-h2, h3 {letter-spacing: -0.01em;}
-[data-testid="stMetric"] {background: #fff; border: 1px solid rgba(11,11,11,.08); border-radius: 12px;
-  padding: 14px 16px; box-shadow: 0 1px 2px rgba(11,11,11,.04);}
-[data-testid="stMetricLabel"] p {color: #52514e; font-size: .85rem;}
-[data-testid="stTabs"] button p {font-size: 1rem; font-weight: 600;}
-[data-testid="stSidebar"] {border-right: 1px solid rgba(11,11,11,.08);}
-.hero {background: linear-gradient(120deg, #0d2a4d 0%, #1c5cab 55%, #2a78d6 100%); color: #fff;
-  border-radius: 16px; padding: 26px 30px 22px; margin-bottom: 18px;}
-.hero h1 {color: #fff; font-size: 2.05rem; margin: 0 0 4px; padding: 0; line-height: 1.15;}
-.hero p {color: #dbe7f7; margin: 0 0 14px; font-size: 1.02rem;}
-.chip {display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600;
-  margin: 0 6px 6px 0; background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.25);}
-.chip.real {background: #0ca30c; border-color: #0ca30c;}
-.chip.syn {background: #eda100; border-color: #eda100; color: #1a1a19;}
-.card {background: #fff; border: 1px solid rgba(11,11,11,.08); border-radius: 14px; padding: 18px 20px;
-  min-height: 290px; box-shadow: 0 1px 2px rgba(11,11,11,.04);}
-.card .step {font-size: .75rem; font-weight: 700; color: #2a78d6; letter-spacing: .08em; text-transform: uppercase;}
-.card h4 {margin: 4px 0 8px; font-size: 1.15rem;}
-.big {font-size: 1.9rem; font-weight: 700; line-height: 1.1; margin: 4px 0;}
-.muted {color: #52514e; font-size: .9rem; line-height: 1.45;}
-.feed {background: #fff; border: 1px solid rgba(11,11,11,.08); border-radius: 14px; padding: 4px 16px;}
-.feed-row {display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eeede9;}
-.feed-row:last-child {border-bottom: none;}
-.feed-time {color: #898781; font-size: .8rem; min-width: 92px;}
-.feed-head {flex: 1; font-size: .93rem; color: #0b0b0b;}
-.tag {display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: .74rem; font-weight: 600;
-  background: #eef3fb; color: #1c5cab; margin-right: 4px; white-space: nowrap;}
-.tag.tk {background: #f0efec; color: #0b0b0b;}
-.pill {display: inline-block; min-width: 46px; text-align: center; padding: 2px 8px; border-radius: 999px;
-  font-size: .78rem; font-weight: 700; color: #fff;}
-.signal {background: #fff; border: 1px solid rgba(11,11,11,.08); border-radius: 14px; padding: 18px 22px;}
-.signal .headline {font-size: 1.15rem; font-weight: 600; margin-bottom: 10px; line-height: 1.4;}
-.meter {display: flex; gap: 3px; margin-top: 4px;}
-.meter span {height: 10px; flex: 1; border-radius: 2px; background: #e1e0d9;}
-.note {border-left: 4px solid #eda100; background: #fffaf0; padding: 10px 14px; border-radius: 6px;
-  color: #52514e; font-size: .92rem; margin: 6px 0 14px;}
-.note.ok {border-color: #2a78d6; background: #f3f7fd;}
+:root {{{_vars} --neu: var(--faint);}}
+.block-container {{padding-top: 4rem; max-width: 1400px;}}
+[data-testid="stHeader"] {{background: transparent;}}
+{TOGGLE} > div:first-child {{width: 52px !important; height: 28px !important; padding: 3px !important;
+  box-sizing: border-box; background: var(--surface2) !important; box-shadow: inset 0 0 0 1px var(--border);}}
+{TOGGLE} > div:first-child > div {{width: 22px !important; height: 22px !important; background: #fff url("{SUN}")
+  center / 14px no-repeat !important; box-shadow: 0 1px 3px rgba(0,0,0,.25);}}
+{TOGGLE}:has(input:checked) > div:first-child {{background: var(--accent) !important; box-shadow: none;}}
+{TOGGLE}:has(input:checked) > div:first-child > div {{transform: translateX(24px) !important;
+  background: #0d1117 url("{MOON}") center / 13px no-repeat !important;}}
+.stApp {{background: var(--bg);}}
+h2, h3 {{letter-spacing: -0.015em; color: var(--text);}}
+h3 {{font-size: 1.2rem !important; font-weight: 650 !important; padding-bottom: .1rem !important;}}
+[data-testid="stCaptionContainer"] p {{color: var(--muted);}}
+[data-testid="stMetric"] {{background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px;}}
+[data-testid="stMetricLabel"] p {{color: var(--muted); font-size: .78rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em;}}
+[data-testid="stMetricValue"] {{font-variant-numeric: tabular-nums; font-weight: 650; font-size: 1.75rem;}}
+[data-testid="stTabs"] [role="tablist"] {{gap: 4px; border-bottom: 1px solid var(--border);}}
+[data-testid="stTabs"] button {{padding: 8px 14px;}}
+[data-testid="stTabs"] button p {{font-size: .95rem; font-weight: 600;}}
+[data-testid="stTabs"] button[aria-selected="false"] p {{color: var(--muted);}}
+[data-testid="stSidebar"] {{border-right: 1px solid var(--border);}}
+[data-testid="stPlotlyChart"] {{background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 6px 4px 2px; overflow: hidden;}}
+[data-testid="stExpander"] details {{background: var(--surface); border-color: var(--border); border-radius: 12px;}}
+.topbar {{display: flex; align-items: center; gap: 10px; min-height: 40px;}}
+.logo {{width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff; display: flex;
+  align-items: center; justify-content: center; font-weight: 800; font-size: .78rem;}}
+.brand {{font-weight: 700; font-size: 1rem; color: var(--text);}}
+.brand-sub {{color: var(--faint); font-size: .85rem;}}
+.hero {{background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--accent);
+  border-radius: 14px; padding: 22px 26px 18px; margin: 6px 0 18px;}}
+.hero .eyebrow {{font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent);}}
+.hero h1 {{color: var(--text); font-size: 1.9rem; font-weight: 750; margin: 4px 0 6px; padding: 0;
+  line-height: 1.15; letter-spacing: -0.02em;}}
+.hero p {{color: var(--muted); margin: 0 0 14px; font-size: 1rem; max-width: 900px; line-height: 1.5;}}
+.chip {{display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-size: .78rem; font-weight: 600; margin: 0 6px 6px 0; background: var(--surface2); color: var(--muted);
+  border: 1px solid var(--border);}}
+.chip .dot {{width: 7px; height: 7px; border-radius: 50%; background: currentColor;}}
+.chip.real {{background: var(--ok-soft); color: var(--ok); border-color: transparent;}}
+.chip.syn {{background: var(--warn-soft); color: var(--warn); border-color: transparent;}}
+.card {{background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px;
+  height: 100%; min-height: 330px;}}
+.card .step {{display: flex; align-items: center; gap: 8px; font-size: .72rem; font-weight: 700; color: var(--accent);
+  letter-spacing: .08em; text-transform: uppercase;}}
+.card .num {{width: 22px; height: 22px; border-radius: 6px; background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; font-size: .75rem; letter-spacing: 0;}}
+.card h4 {{margin: 10px 0 8px; font-size: 1.08rem; font-weight: 650; color: var(--text); padding: 0;}}
+.card .rule {{height: 1px; background: var(--border); margin: 12px 0;}}
+.big {{font-size: 1.9rem; font-weight: 700; line-height: 1.1; margin: 4px 0; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;}}
+.muted {{color: var(--muted); font-size: .9rem; line-height: 1.5;}}
+.feed {{background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 2px 16px;}}
+.feed-row {{display: flex; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border);}}
+.feed-row:last-child {{border-bottom: none;}}
+.feed-time {{color: var(--faint); font-size: .78rem; min-width: 88px; font-variant-numeric: tabular-nums;}}
+.feed-head {{flex: 1; font-size: .92rem; color: var(--text); line-height: 1.45;}}
+.tag {{display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: .72rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent); margin-right: 4px; white-space: nowrap;}}
+.tag.tk {{background: var(--neutral-soft); color: var(--text);}}
+.pill {{display: inline-block; min-width: 48px; text-align: center; padding: 2px 8px; border-radius: 999px;
+  font-size: .76rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;}}
+.pill.pos {{background: var(--pos-soft); color: var(--pos);}}
+.pill.neg {{background: var(--neg-soft); color: var(--neg);}}
+.pill.warn {{background: var(--warn-soft); color: var(--warn);}}
+.pill.neu {{background: var(--neutral-soft); color: var(--muted);}}
+.signal {{background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 22px;}}
+.signal .headline {{font-size: 1.12rem; font-weight: 600; margin: 4px 0 10px; line-height: 1.45; color: var(--text);}}
+.meter {{display: flex; gap: 3px; margin-top: 8px;}}
+.meter span {{height: 10px; flex: 1; border-radius: 2px; background: var(--neutral-soft);}}
+.note {{border: 1px solid var(--border); border-left: 4px solid var(--warn); background: var(--surface);
+  padding: 10px 14px; border-radius: 8px; color: var(--muted); font-size: .92rem; margin: 6px 0 14px;}}
+.note b {{color: var(--text);}}
+.note.ok {{border-left-color: var(--accent);}}
 </style>
 """, unsafe_allow_html=True)
 
 
 def fig_style(fig, height=360):
+    axis = dict(gridcolor=T["grid"], linecolor=T["border"], zerolinecolor=T["border"], tickfont=dict(color=T["muted"]))
     fig.update_layout(height=height, margin=dict(l=10, r=10, t=44, b=10), hovermode="closest",
-                      template="plotly_white", paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-                      font=dict(family="Source Sans Pro, sans-serif", color="#0b0b0b"),
-                      legend=dict(orientation="h", yanchor="top", y=-0.12, x=0))
+                      template="plotly_dark" if T["base"] == "dark" else "plotly_white",
+                      paper_bgcolor=T["surface"], plot_bgcolor=T["surface"],
+                      font=dict(family="Inter, Source Sans Pro, sans-serif", color=T["text"]),
+                      hoverlabel=dict(bgcolor=T["surface2"], bordercolor=T["border"], font=dict(color=T["text"])),
+                      legend=dict(orientation="h", yanchor="top", y=-0.12, x=0, font=dict(color=T["muted"])))
+    if fig.layout.title.text:  # styling an empty title makes Plotly print "undefined"
+        fig.update_layout(title_font=dict(size=14, color=T["text"]))
+    fig.update_xaxes(**axis)
+    fig.update_yaxes(**axis)
     return fig
 
 
@@ -100,12 +181,12 @@ def esc(x) -> str:
     return html.escape(str(x))
 
 
-def impact_color(v: float) -> str:
-    return "#d03b3b" if v > 7 else ("#ec835a" if v > 5 else "#898781")
+def impact_cls(v: float) -> str:
+    return "neg" if v > 7 else ("warn" if v > 5 else "neu")
 
 
-def sent_color(v: float) -> str:
-    return POS if v > 0.2 else (NEG if v < -0.2 else "#898781")
+def sent_cls(v: float) -> str:
+    return "pos" if v > 0.2 else ("neg" if v < -0.2 else "neu")
 
 
 def section(title: str, caption: str = ""):
@@ -149,7 +230,15 @@ def load_engine(path: str):
     return RiskEngine.load(Path(path))
 
 
-# ---------------------------------------------------------------- sidebar + data
+# ---------------------------------------------------------------- top bar (theme toggle) + sidebar + data
+bar_l, bar_r = st.columns([5, 1], vertical_alignment="center")
+bar_l.markdown('<div class="topbar"><div class="logo">NR</div><span class="brand">NLP Risk Engine</span>'
+               '<span class="brand-sub">/ risk signals dashboard</span></div>', unsafe_allow_html=True)
+with bar_r.container(horizontal_alignment="right"):
+    st.session_state.dark_mode = st.session_state.get("dark", False)
+    st.toggle("Dark mode", key="dark_mode", label_visibility="collapsed", width="content",
+              on_change=lambda: st.session_state.update(dark=st.session_state.dark_mode))
+
 with st.sidebar:
     st.markdown("## Controls")
     mode = st.radio("Data source", [SYNTHETIC, REAL_MODE])
@@ -195,11 +284,12 @@ n_src = signals.source_type.value_counts()
 span = f"{signals.timestamp.min():%d %b} to {signals.timestamp.max():%d %b %Y}"
 
 # ---------------------------------------------------------------- hero
-badge = ('<span class="chip real">REAL DATA · Google News + Yahoo Finance</span>' if is_real
-         else '<span class="chip syn">SYNTHETIC DATA · generated corpus</span>')
+badge = ('<span class="chip real"><span class="dot"></span>Real data · Google News + Yahoo Finance</span>'
+         if is_real else '<span class="chip syn"><span class="dot"></span>Synthetic data · generated corpus</span>')
 st.markdown(f"""
 <div class="hero">
-  <h1>NLP Risk Engine</h1>
+  <div class="eyebrow">Text to risk signals</div>
+  <h1>From headlines to portfolio action</h1>
   <p>Unstructured news &amp; social text in &rarr; sentiment, event type and impact out &rarr; an index that rebalances
   and a banking book that gets stress-tested.</p>
   {badge}<span class="chip">{len(signals):,} signals</span><span class="chip">{span}</span>
@@ -236,7 +326,7 @@ with tab_home:
     cols = st.columns(4)
     for col, (step, title, big, sub, body) in zip(cols, cards):
         col.markdown(f"""<div class="card"><div class="step">{step}</div><h4>{title}</h4>
-            <div class="big">{big}</div><div class="muted">{sub}</div><hr style="margin:10px 0;border-color:#eeede9">
+            <div class="big">{big}</div><div class="muted">{sub}</div><div class="rule"></div>
             <div class="muted">{body}</div></div>""", unsafe_allow_html=True)
 
     st.write("")
@@ -250,10 +340,10 @@ with tab_home:
             rows.append(f"""<div class="feed-row"><div class="feed-time">{r.timestamp:%d %b %H:%M}</div>
               <div class="feed-head"><span class="tag">{esc(r.event_type)}</span>
               {f'<span class="tag tk">{esc(r.ticker)}</span>' if r.ticker else ''}{esc(r.headline[:120])}</div>
-              <span class="pill" style="background:{sent_color(r.sentiment)}">{r.sentiment:+.2f}</span>
-              <span class="pill" style="background:{impact_color(r.impact)}">{r.impact:.1f}</span></div>""")
+              <span class="pill {sent_cls(r.sentiment)}">{r.sentiment:+.2f}</span>
+              <span class="pill {impact_cls(r.impact)}">{r.impact:.1f}</span></div>""")
         st.markdown(f'<div class="feed">{"".join(rows)}</div>', unsafe_allow_html=True)
-        st.caption("Pills: sentiment (blue positive, red negative) and impact (red above 7).")
+        st.caption("Pills: sentiment (blue positive, red negative) and impact (amber above 5, red above 7).")
     with right:
         section("Signals by event type")
         counts = signals.event_type.value_counts().sort_values()
@@ -291,14 +381,14 @@ with tab_engine:
                 st.warning("Text is empty after cleaning.")
             else:
                 out = load_engine(str(ENGINE_PATH)).analyze(docs).iloc[0]
-                segs = "".join(f'<span style="background:{impact_color(out.impact) if i < round(out.impact) else "#e1e0d9"}">'
-                               f'</span>' for i in range(10))
+                segs = "".join(f'<span style="background:var(--{impact_cls(out.impact)})"></span>' if i < round(out.impact)
+                               else '<span></span>' for i in range(10))
                 st.markdown(f"""<div class="signal"><div class="headline">{esc(txt)}</div>
                     <span class="tag">{esc(out.event_type)} · {out.event_confidence:.0%} confident</span>
                     <span class="tag tk">{esc(out.ticker or 'market-wide')}</span>
                     <span class="tag tk">{esc(src)}</span>
                     <div style="display:flex;gap:28px;margin-top:12px;flex-wrap:wrap">
-                      <div><div class="muted">Sentiment</div><div class="big" style="color:{sent_color(out.sentiment)}">
+                      <div><div class="muted">Sentiment</div><div class="big" style="color:var(--{sent_cls(out.sentiment)})">
                         {out.sentiment:+.2f}</div></div>
                       <div style="min-width:220px"><div class="muted">Impact {out.impact:.1f} / 10</div>
                         <div class="meter">{segs}</div></div>
@@ -396,7 +486,7 @@ with tab_a:
             sec = sector[t]
             fig.add_trace(go.Scatter(x=res.weights.index, y=res.weights[t], name=sec, legendgroup=sec,
                                      showlegend=sec not in shown, stackgroup="w", mode="lines",
-                                     line=dict(width=1, color="white"), fillcolor=SERIES[sectors.index(sec)],
+                                     line=dict(width=1, color=T["surface"]), fillcolor=SERIES[sectors.index(sec)],
                                      hovertemplate=f"{t} ({sec}): %{{y:.1%}}<extra></extra>"))
             shown.add(sec)
         fig.update_layout(title="Index weights over time (one band per stock; hover for ticker)",
@@ -443,7 +533,8 @@ with tab_a:
             (res.weights.iloc[-1] - res.weights.iloc[0]).abs().sort_values().index[-3:]), max_selections=6)
         fig = go.Figure([go.Scatter(x=res.weights.index, y=res.weights[t], name=t, mode="lines",
                                     line=dict(width=2, color=SERIES[i])) for i, t in enumerate(pick)])
-        fig.add_hline(y=1 / len(order), line_dash="dot", line_color="gray", annotation_text="equal weight")
+        fig.add_hline(y=1 / len(order), line_dash="dot", line_color=T["faint"], annotation_text="equal weight",
+                      annotation_font_color=T["muted"])
         fig.update_layout(title="Selected stock weights", yaxis_tickformat=".0%", hovermode="x unified")
         st.plotly_chart(fig_style(fig, 360), width="stretch")
 
@@ -475,8 +566,8 @@ with tab_b:
             measure=["absolute", "relative", "relative", "relative", "total"],
             y=[res.value_before, *parts, 0], text=[f"{res.value_before:,.1f}", *[f"{p:+,.1f}" for p in parts],
                                                    f"{res.value_after:,.1f}"],
-            increasing=dict(marker_color=POS), decreasing=dict(marker_color=NEG), totals=dict(marker_color="#898781"),
-            connector=dict(line=dict(color="#c3c2b7", width=1))))
+            increasing=dict(marker_color=POS), decreasing=dict(marker_color=NEG), totals=dict(marker_color=T["faint"]),
+            connector=dict(line=dict(color=T["border"], width=1))))
         lo = min(res.value_before, res.value_after) + min(0, min(parts))
         fig.update_layout(title="Portfolio value: before to after ($m)",
                           yaxis=dict(range=[lo * 0.97, max(res.value_before, res.value_after) * 1.01]))
@@ -505,7 +596,7 @@ with tab_b:
         sub = summ[summ.event_type.isin(types)]
         fig = go.Figure(go.Scatter(
             x=sub.timestamp, y=sub.event_type, mode="markers",
-            marker=dict(size=8 + 60 * sub.pnl_pct.abs(), color=SERIES[0], opacity=0.7, line=dict(width=1, color="white")),
+            marker=dict(size=8 + 60 * sub.pnl_pct.abs(), color=SERIES[0], opacity=0.7, line=dict(width=1, color=T["surface"])),
             customdata=sub[["ticker", "impact", "pnl_pct", "headline"]].values,
             hovertemplate="%{x|%b %d %H:%M} %{y} %{customdata[0]}<br>impact %{customdata[1]:.1f}, "
                           "P&L %{customdata[2]:.2%}<br>%{customdata[3]}<extra></extra>"))
@@ -529,8 +620,8 @@ with tab_b:
                 {esc(sig['source_type'])}</div><div class="headline">{esc(sig['headline'])}</div>
                 <span class="tag">{esc(sig['event_type'])}</span>
                 <span class="tag tk">{esc(sig.get('ticker') or 'market-wide')}</span>
-                <span class="pill" style="background:{sent_color(sig['sentiment'])}">sentiment {sig['sentiment']:+.2f}</span>
-                <span class="pill" style="background:{impact_color(sig['impact'])}">impact {sig['impact']:.1f}</span>
+                <span class="pill {sent_cls(sig['sentiment'])}">sentiment {sig['sentiment']:+.2f}</span>
+                <span class="pill {impact_cls(sig['impact'])}">impact {sig['impact']:.1f}</span>
                 <div class="muted" style="margin-top:10px">Applied shock (scenario x impact/10): {' · '.join(shocks)}.
                 {esc(SCENARIOS[res.scenario].rationale)}.</div></div>""", unsafe_allow_html=True)
             st.write("")

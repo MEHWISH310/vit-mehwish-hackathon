@@ -1,10 +1,16 @@
+# Light defaults; app.py switches these at runtime when the Light / Dark toggle changes (keep in sync with THEMES)
 [theme]
 base = "light"
-primaryColor = "#2a78d6"
-backgroundColor = "#f6f7f9"
+primaryColor = "#2563eb"
+backgroundColor = "#f4f5f7"
 secondaryBackgroundColor = "#ffffff"
-textColor = "#0b0b0b"
-font = "sans serif"
+textColor = "#0f1419"
+borderColor = "#e2e5ea"
+linkColor = "#2563eb"
+dataframeHeaderBackgroundColor = "#f0f2f5"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap, sans-serif"
+baseRadius = "8px"
+showWidgetBorder = true
 
 [client]
 toolbarMode = "minimal"
