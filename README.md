@@ -39,7 +39,7 @@ The engine ingests **financial news** and **X/Twitter-style posts** into one sch
 | Dashboard | `app.py`, `.streamlit/config.toml` | Streamlit + Plotly: Overview (story cards, live risk feed), Risk Engine (one-click live scoring, real-text accuracy), Module A, Module B; sidebar switch between synthetic and real data |
 | Docs | `scripts/make_docs.py` | regenerates `docs/results.json`, figures, `architecture.png`, `presentation.pdf` from a real run |
 
-**Tech stack:** Python 3.13, pandas, NumPy, scikit-learn, vaderSentiment, FastAPI + Uvicorn, Streamlit, Plotly, matplotlib, yfinance (data fetch only), pytest. Everything runs locally on CPU; no API keys are needed.
+**Tech stack:** Python 3.13, pandas, NumPy, scikit-learn, vaderSentiment, FastAPI + Uvicorn, Streamlit, Plotly, matplotlib, yfinance (data fetch only), pytest; PyTorch + Hugging Face Transformers only for the optional FinBERT benchmark. Everything runs locally on CPU; no API keys are needed.
 
 ### Module A: tactical index rebalancing (subscribes to Sentiment Score)
 - Mock index: 15 S&P 100 stocks across 6 sectors (`data/universe.csv`), starting at equal weight (1/15).
@@ -120,7 +120,7 @@ cd vit-mehwish-hackathon
 pip install -r requirements.txt
 python -m src.engine.pipeline      # ~5-10 s: trains the engine on synthetic data, writes outputs/signals.csv(.jsonl), models/engine.joblib
 python -m src.engine.real          # ~1 min: real-data mode (evaluates + retrains sentiment, scores real headlines) -> outputs/real_signals.csv
-python -m pytest -q tests          # 32 tests
+python -m pytest -q tests          # 33 tests
 streamlit run app.py               # dashboard at http://localhost:8501 (switch data source in the sidebar)
 ```
 
@@ -128,6 +128,7 @@ Optional:
 ```bash
 uvicorn src.engine.api:app --reload   # REST API, docs at http://127.0.0.1:8000/docs
 python scripts/make_docs.py           # regenerate docs/results.json, figures, architecture.png, presentation.pdf
+python scripts/eval_finbert.py        # FinBERT benchmark -> docs/finbert_results.json (needs: pip install torch transformers; ~10 min on CPU)
 python scripts/fetch_real_data.py     # re-download the real data in data/real/ (already committed; ~10 min)
 python scripts/generate_data.py       # regenerate the synthetic data in data/ (already committed)
 ```
@@ -148,6 +149,21 @@ Every number below comes from `python -m src.engine.pipeline` (`outputs/eval_met
 *(accuracy / macro-F1, 3 classes)*
 
 **The lesson.** On its own synthetic data the engine looks excellent: 5-fold out-of-fold sentiment r 0.908, 3-class accuracy 0.899, event accuracy 0.969 (macro-F1 0.974), impact MAE 0.85. On real wording it is no better than always guessing "neutral", because the ML part learned the generator's templates. The 20 handwritten holdout texts hinted at this (event accuracy 0.90, sentiment r 0.878, with the plain lexicon slightly ahead of the blend). Retraining on real labelled data, evaluated on official held-out splits, closes most of the gap. Real-mode signals: 20,437 (13,875 company, 6,562 market-wide), 561 with impact > 7.
+
+### Benchmark: our model vs FinBERT, a pre-trained finance transformer
+
+[`scripts/eval_finbert.py`](scripts/eval_finbert.py) runs [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) on the same held-out real text, with the same cleaning (`docs/finbert_results.json`).
+
+| | FinBERT (off the shelf) | **Our real-trained model** |
+|---|---|---|
+| Real finance tweets, official held-out split (n = 2,388) | acc 0.713 / F1 0.660 | **0.828 / 0.770** |
+| Speed on the same laptop CPU | 32 texts/s | **~10,900 texts/s (~340x faster)** |
+| Model size | 438 MB | **3.4 MB** |
+| GPU needed to retrain | yes, in practice | no (trains in seconds) |
+
+- **The tweet test is fair.** FinBERT never saw these tweets, and our model only saw the separate training split. FinBERT learned from formal news sentences, so it struggles with tweet wording (cashtags, abbreviations, "pulls outlook"). A small model trained on the target style wins.
+- **We don't claim a PhraseBank win.** FinBERT scores 0.972 / 0.963 on our PhraseBank set, but it was fine-tuned on Financial PhraseBank, so most of those sentences are in its training data. That number isn't comparable with our 5-fold 0.890.
+- **Why it matters:** the engine must score tens of thousands of headlines and posts as they arrive. At 32 texts/s, FinBERT needs about 11 minutes on CPU for our 20,437 real headlines; our model needs about 2 seconds, with higher accuracy on social text. Fine-tuning FinBERT on tweets would probably close the accuracy gap, at GPU cost (see next steps).
 
 ### Module A: sentiment index vs equal weight
 
@@ -197,7 +213,7 @@ Every number below comes from `python -m src.engine.pipeline` (`outputs/eval_met
 ### Limitations and next steps
 - **Event and impact models are trained on synthetic labels only.** On real text, impact keys on dramatic wording (*"War breaks out in the Middle East; oil spikes and markets sell off sharply"* scores 5.7). Next step: label real headlines for event type, and learn impact from actual price reactions (an event study).
 - **The real backtest is short** (64 days, 15 stocks), with date-level timestamps. Next step: a longer history, intraday prices, transaction costs, and a study of how quickly signals decay.
-- **Sentiment:** next step is to fine-tune a finance transformer (e.g. FinBERT) and compare it with the current real-trained model.
+- **Sentiment:** off-the-shelf FinBERT already loses to our model on real tweets (0.71 vs 0.83) and is ~340x slower. Next step: fine-tune FinBERT on the tweet training split (GPU), and if it wins, use it as a slower second opinion on high-impact signals only.
 - **The stress model is first-order** (duration/beta): no convexity or gamma, vega, cross-asset correlations, rating migration, default losses or liquidity effects. Scenario sizes are expert judgement and the portfolio is synthetic. Next step: calibrate to historical episodes and add correlated factor shocks.
 
 ## Repository structure

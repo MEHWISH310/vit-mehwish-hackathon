@@ -1,0 +1,33 @@
+{
+  "model": "ProsusAI/finbert",
+  "twitter_test": {
+    "n": 2388,
+    "fair_test": true,
+    "finbert_zero_shot": {
+      "accuracy": 0.713,
+      "macro_f1": 0.66
+    },
+    "engine_real_trained": {
+      "accuracy": 0.828,
+      "macro_f1": 0.77
+    }
+  },
+  "phrasebank": {
+    "n": 2264,
+    "fair_test": false,
+    "note": "ProsusAI/finbert was fine-tuned on Financial PhraseBank: in-sample for FinBERT",
+    "finbert": {
+      "accuracy": 0.972,
+      "macro_f1": 0.963
+    }
+  },
+  "speed_texts_per_sec_cpu": {
+    "finbert": 31.9,
+    "engine_real_trained": 10921.0
+  },
+  "model_size_mb": {
+    "finbert": 438,
+    "engine_real_trained": 3.4
+  },
+  "speedup_engine_vs_finbert": 342.4
+}

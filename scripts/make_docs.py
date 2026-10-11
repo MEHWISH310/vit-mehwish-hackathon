@@ -118,6 +118,7 @@ def compute() -> dict:
     headlines = pd.read_csv(DATA / "real" / "news_headlines.csv")
     r["real"] = {
         "eval": json.loads((OUT / "real_eval_metrics.json").read_text()),
+        "finbert": json.loads((DOCS / "finbert_results.json").read_text()) if (DOCS / "finbert_results.json").exists() else None,
         "headlines_raw": len(headlines), "publishers": int(headlines.publisher.nunique()),
         "signals": len(rs), "by_scope": rs.scope.value_counts().to_dict(),
         "impact_gt7": int((rs.impact > 7).sum()), "price_days": int(rp.date.nunique()),
@@ -348,7 +349,7 @@ def deck(r, path):
                 "the generator's templates, so this is the optimistic number.",
                 "Real text exposed the gap: the synthetic-trained sentiment model is no better than always guessing "
                 "'neutral'. Retraining on real labelled text fixed it.",
-                "Tech: Python 3.13, pandas, scikit-learn, vaderSentiment, FastAPI, Streamlit, Plotly; 32 pytest tests.",
+                "Tech: Python 3.13, pandas, scikit-learn, vaderSentiment, FastAPI, Streamlit, Plotly; 33 pytest tests.",
             ], size=12, width=56, gap=0.006)
             rows = [["Real tweets (held-out)", f"{tw['n']:,}", am(tw["synthetic_trained_engine"]), am(tw["real_trained_label"])],
                     ["Real news (PhraseBank, 5-fold)", f"{pb['n']:,}", am(pb["synthetic_trained_engine"]), am(pb["real_trained_label"])],
@@ -357,10 +358,24 @@ def deck(r, path):
                     ["Handwritten holdout: event acc.", "20", f"{ho['event_accuracy']:.2f}", ""]]
             table(fig, [0.50, 0.55, 0.47, 0.28], rows, ["Sentiment test set", "n", "Synthetic-trained", "Real-trained"],
                   [.38, .08, .27, .27], size=10, scale=2.0)
-            fig.text(0.50, 0.50, textwrap.fill(
+            fig.text(0.50, 0.585, textwrap.fill(
                 "Lesson: a model that looks excellent on synthetic data can fail on real wording. Measuring on held-out real "
                 "text (official splits; blend weight chosen by CV on training data only) is what made the engine credible.",
                 64), fontsize=10.5, color=INK2, va="top", linespacing=1.4)
+            if rl.get("finbert"):
+                fb = rl["finbert"]
+                fbt, sp = fb["twitter_test"], fb["speed_texts_per_sec_cpu"]
+                fig.text(0.50, 0.44, "Benchmark vs FinBERT (pre-trained finance transformer)", fontsize=12,
+                         fontweight="bold", color=INK, va="top")
+                table(fig, [0.50, 0.19, 0.47, 0.22],
+                      [["Real tweets, held-out (2,388)", am(fbt["finbert_zero_shot"]), am(fbt["engine_real_trained"])],
+                       ["Speed, same CPU", f"{sp['finbert']:,.0f} texts/s", f"{sp['engine_real_trained']:,.0f} texts/s"],
+                       ["Model size", f"{fb['model_size_mb']['finbert']:,} MB", f"{fb['model_size_mb']['engine_real_trained']:.1f} MB"]],
+                      ["", "FinBERT (off the shelf)", "Our real-trained model"], [.38, .31, .31], size=10, scale=1.7)
+                fig.text(0.50, 0.225, textwrap.fill(
+                    f"Ours is more accurate on social text and ~{fb['speedup_engine_vs_finbert']:.0f}x faster. FinBERT's "
+                    f"{fb['phrasebank']['finbert']['accuracy']:.2f} on PhraseBank is in-sample (it was trained on it), so it is not compared.",
+                    70), fontsize=9.5, color=INK2, va="top", linespacing=1.35)
         slide(pdf, 3, "Implementation: the NLP Risk Engine", s3)
 
         def s4(fig):
@@ -428,7 +443,7 @@ def deck(r, path):
             fig.text(0.53, 0.82, "Next steps", fontsize=15, fontweight="bold", color=INK)
             bullets(fig, 0.53, 0.77, [
                 "Label real headlines for event type and learn impact from actual price reactions (event study).",
-                "Fine-tune a finance transformer (e.g. FinBERT) and compare against the current real-trained model.",
+                "Fine-tune FinBERT on real tweets (off the shelf it loses: 0.71 vs our 0.83, ~340x slower); use it on high-impact signals only.",
                 "Longer real backtest with intraday prices and transaction costs; test faster signal decay.",
                 "Calibrate shocks to historical episodes; add convexity, correlated factor shocks and credit migration.",
                 "Replace the in-process bus with Kafka and stream live news into the dashboard.",

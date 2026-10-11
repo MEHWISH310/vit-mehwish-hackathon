@@ -255,6 +255,8 @@ universe = load_universe()
 is_real = mode == REAL_MODE
 real_eval_path = OUT / "real_eval_metrics.json"
 real_eval = json.loads(real_eval_path.read_text()) if real_eval_path.exists() else None
+finbert_path = ROOT / "docs" / "finbert_results.json"  # from scripts/eval_finbert.py (committed: no torch needed here)
+finbert = json.loads(finbert_path.read_text()) if finbert_path.exists() else None
 
 with st.sidebar:
     with st.expander("Module A: index rebalancer", expanded=True):
@@ -428,6 +430,21 @@ with tab_engine:
         st.plotly_chart(fig_style(fig, 330).update_layout(margin=dict(t=10)), width="stretch")
         note("Trained only on synthetic text, the engine was no better than always guessing 'neutral' on real wording. "
              "Real-data mode retrains sentiment on real labelled text; synthetic mode keeps the original engine.", ok=True)
+        if finbert:
+            fb_tw, sp = finbert["twitter_test"], finbert["speed_texts_per_sec_cpu"]
+            section("Benchmark: our model vs FinBERT (pre-trained finance transformer)",
+                    f"Same {fb_tw['n']:,} held-out real tweets, same cleaning, same laptop CPU. Off-the-shelf {finbert['model']}.")
+            c = st.columns(4)
+            c[0].metric("Accuracy: ours", f"{fb_tw['engine_real_trained']['accuracy']:.0%}",
+                        f"{fb_tw['engine_real_trained']['accuracy'] - fb_tw['finbert_zero_shot']['accuracy']:+.0%} vs FinBERT")
+            c[1].metric("Accuracy: FinBERT", f"{fb_tw['finbert_zero_shot']['accuracy']:.0%}")
+            c[2].metric("Speed: ours / FinBERT", f"{sp['engine_real_trained']:,.0f} / {sp['finbert']:,.0f} texts/s",
+                        f"{finbert['speedup_engine_vs_finbert']:.0f}x faster")
+            c[3].metric("Model size: ours / FinBERT", f"{finbert['model_size_mb']['engine_real_trained']:.1f} / "
+                        f"{finbert['model_size_mb']['finbert']:,} MB")
+            note(f"FinBERT learned from formal news sentences and misreads tweet wording. On PhraseBank it scores "
+                 f"{finbert['phrasebank']['finbert']['accuracy']:.0%}, but it was trained on PhraseBank, so that number "
+                 "is in-sample and not a fair comparison.")
 
     left, right = st.columns(2)
     with left:
