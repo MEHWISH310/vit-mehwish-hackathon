@@ -227,7 +227,7 @@ vit-mehwish-hackathon/
 ├── data/                      synthetic data, data/eval handwritten sets, data/real public data
 ├── scripts/                   generate_data.py, fetch_real_data.py, make_docs.py
 ├── tests/                     test_engine.py, test_modules.py, test_real.py
-└── docs/                      presentation.pdf, architecture.png, demo_script.md, results.json, figures/, img/
+└── docs/                      presentation.pdf, architecture.png, finbert_results.json, results.json, figures/, img/
 ```
 
 ## License
