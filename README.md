@@ -1,9 +1,13 @@
 # NLP Risk Engine: Sentiment Index Rebalancer & Event-Driven Stress Tester - S&P Global & Crisil Campus Hackathon
 
 **Candidate Name:** Mehwish
+
 **College Email ID:** mehwish.2023@vitstudent.ac.in
+
 **College / Campus:** VIT
-**Demo Video Link:** [YouTube (unlisted) link - to be added]
+
+**Demo Video Link:** https://youtu.be/3Nhjr4JvWkI
+
 **Slide Deck Link (if hosted externally):** not hosted externally; the deck is in the repo at [`docs/presentation.pdf`](docs/presentation.pdf)
 
 ## 1. Project Overview / Problem Statement & Approach
